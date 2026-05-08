@@ -1,0 +1,32 @@
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+// import { AuthSessionProvider } from "@/components/auth/session-provider";
+import { AppShell } from "@/components/layout/app-shell";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
+
+export const metadata: Metadata = {
+  title: "Flujo de Caja | Xtendo",
+  description:
+    "Dashboard de análisis financiero - Ingresos, egresos y flujo de caja",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="es" className={inter.variable}>
+      <body className="font-sans">
+        {/* <AuthSessionProvider>
+          </AuthSessionProvider> */}
+        <AppShell>{children}</AppShell>
+      </body>
+    </html>
+  );
+}
