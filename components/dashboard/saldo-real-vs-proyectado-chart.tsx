@@ -81,9 +81,9 @@ export function SaldoRealVsProyectadoChart({
                   color: "white",
                   fontSize: 12,
                 }}
-                formatter={(value: number | null, name: string) => {
-                  if (value === null) return ["—", name];
-                  return [formatCurrency(value, { symbol: "Bs " }), name];
+                formatter={(value: any, name) => {
+                  if (value === null || value === undefined) return ["—", String(name)];
+                  return [formatCurrency(Number(value), { symbol: "Bs " }), String(name)];
                 }}
               />
               <Legend
