@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import { getMovements } from "@/lib/sheets";
 import { buildDashboard } from "@/lib/aggregations";
 
-// Cachea 60 segundos en el servidor; el sheet no cambia tan rápido
-export const revalidate = 60;
+// Sin cache en el server: cada request lee el sheet fresco.
+// Esto habilita el comportamiento "tiempo real" del cliente (polling cada 30s,
+// refresh on focus, botón manual). Google Sheets API permite 300 reads/min
+// gratis — incluso con varios usuarios concurrentes estamos lejos del límite.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
   try {

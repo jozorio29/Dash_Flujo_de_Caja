@@ -1,4 +1,5 @@
-import { ComingSoon } from "@/components/layout/coming-soon";
+import { CashFlowView } from "@/components/dashboard/cash-flow-view";
+
 export default function Page() {
-  return <ComingSoon title="Flujo de Caja" />;
+  return <CashFlowView />;
 }

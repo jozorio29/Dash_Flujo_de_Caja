@@ -1,0 +1,196 @@
+import {
+  ProjectedDashboardData,
+  ProjectedMovement,
+  ProjectedSummary,
+} from "./types";
+import { parseAmount, parseDate } from "./utils";
+
+interface SheetsResponse {
+  range: string;
+  majorDimension: string;
+  values: string[][];
+}
+
+/**
+ * Lee la pestaña de pagos proyectados (mismo spreadsheet, otra pestaña).
+ * El nombre/rango se controla con PROYECTADO_RANGE en .env.local.
+ */
+export async function fetchProyectadoRows(): Promise<string[][]> {
+  const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
+  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  const range = process.env.PROYECTADO_RANGE || "Flujo!A:J";
+
+  if (!apiKey) throw new Error("GOOGLE_SHEETS_API_KEY no configurada en .env.local");
+  if (!spreadsheetId)
+    throw new Error("GOOGLE_SHEETS_SPREADSHEET_ID no configurada en .env.local");
+
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(
+    range
+  )}?key=${apiKey}&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`;
+
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Google Sheets API error ${res.status}: ${body}`);
+  }
+  const data: SheetsResponse = await res.json();
+  return data.values || [];
+}
+
+/**
+ * Detecta la fila de headers buscando "Fecha" en la primera columna.
+ * Permite hasta 5 filas de "ruido" arriba (títulos, "Pagos proyectados", etc.).
+ */
+function findHeaderRowIndex(rows: string[][]): number {
+  for (let i = 0; i < Math.min(rows.length, 8); i++) {
+    const first = String(rows[i]?.[0] || "").trim().toLowerCase();
+    if (first === "fecha") return i;
+  }
+  return 0;
+}
+
+/**
+ * Posiciones (0-indexed) de las 10 columnas del flujo proyectado.
+ *   A=0 Fecha
+ *   B=1 Concepto
+ *   C=2 Centro de Costo
+ *   D=3 Edificio
+ *   E=4 Status
+ *   F=5 Ingresos
+ *   G=6 Egresos
+ *   H=7 Stand by
+ *   I=8 Saldo en P. Bol
+ *   J=9 Monto en USD
+ */
+const COL = {
+  fecha: 0,
+  concepto: 1,
+  centroCosto: 2,
+  edificio: 3,
+  status: 4,
+  ingresos: 5,
+  egresos: 6,
+  standBy: 7,
+  saldoBs: 8,
+  montoUsd: 9,
+} as const;
+
+export function parseProjectedMovements(rows: string[][]): ProjectedMovement[] {
+  if (!rows.length) return [];
+  const headerIdx = findHeaderRowIndex(rows);
+  const dataRows = rows.slice(headerIdx + 1);
+
+  const out: ProjectedMovement[] = [];
+  for (const row of dataRows) {
+    if (!row || row.length === 0) continue;
+
+    const concepto = String(row[COL.concepto] ?? "").trim();
+    const ingresos = parseAmount(row[COL.ingresos]);
+    const egresos = parseAmount(row[COL.egresos]);
+    const standBy = parseAmount(row[COL.standBy]);
+    const saldoBs = parseAmount(row[COL.saldoBs]);
+    const montoUsd = parseAmount(row[COL.montoUsd]);
+    const fechaRaw = String(row[COL.fecha] ?? "").trim();
+    const parsedFecha = parseDate(row[COL.fecha] as any);
+
+    // Saltar filas separadoras tipo "Pagos proyectados" (sin fecha y sin montos)
+    if (
+      !parsedFecha &&
+      ingresos === 0 &&
+      egresos === 0 &&
+      standBy === 0 &&
+      saldoBs === 0
+    ) {
+      continue;
+    }
+
+    // Saltar etiquetas TOTAL/SUBTOTAL en la fila
+    if (/^(total|subtotal|saldo)/i.test(fechaRaw)) continue;
+    if (/^(total|subtotal)/i.test(concepto)) continue;
+
+    // Si no hay fecha pero tiene montos (raro), igual saltamos para no contaminar
+    if (!parsedFecha) continue;
+
+    out.push({
+      fecha: parsedFecha,
+      fechaRaw,
+      concepto,
+      centroCosto: String(row[COL.centroCosto] ?? "").trim(),
+      edificio: String(row[COL.edificio] ?? "").trim(),
+      status: String(row[COL.status] ?? "").trim(),
+      ingresos,
+      egresos,
+      standBy,
+      saldoBs,
+      montoUsd,
+    });
+  }
+
+  out.sort((a, b) => {
+    const ta = a.fecha?.getTime() ?? 0;
+    const tb = b.fecha?.getTime() ?? 0;
+    return ta - tb;
+  });
+
+  return out;
+}
+
+export function buildProjectedSummary(
+  movements: ProjectedMovement[]
+): ProjectedSummary {
+  let totalIngresos = 0;
+  let totalEgresos = 0;
+  let totalStandBy = 0;
+  for (const m of movements) {
+    totalIngresos += m.ingresos;
+    totalEgresos += m.egresos;
+    totalStandBy += m.standBy;
+  }
+  const last = movements[movements.length - 1];
+  const first = movements[0];
+
+  const isoDay = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  return {
+    totalIngresos,
+    totalEgresos,
+    totalStandBy,
+    netFlow: totalIngresos - totalEgresos,
+    saldoFinalBs: last?.saldoBs ?? 0,
+    saldoFinalUsd: last?.montoUsd ?? 0,
+    numMovimientos: movements.length,
+    fechaInicio: first?.fecha ? isoDay(first.fecha) : null,
+    fechaFin: last?.fecha ? isoDay(last.fecha) : null,
+  };
+}
+
+export function buildProjectedDashboard(
+  movements: ProjectedMovement[]
+): ProjectedDashboardData {
+  const summary = buildProjectedSummary(movements);
+  const statuses = Array.from(
+    new Set(movements.map((m) => m.status).filter(Boolean))
+  ).sort();
+  const centrosCosto = Array.from(
+    new Set(movements.map((m) => m.centroCosto).filter(Boolean))
+  ).sort();
+  const edificios = Array.from(
+    new Set(movements.map((m) => m.edificio).filter(Boolean))
+  ).sort();
+  return {
+    movements,
+    summary,
+    meta: { statuses, centrosCosto, edificios },
+  };
+}
+
+export async function getProjectedDashboard(): Promise<ProjectedDashboardData> {
+  const rows = await fetchProyectadoRows();
+  const movements = parseProjectedMovements(rows);
+  return buildProjectedDashboard(movements);
+}

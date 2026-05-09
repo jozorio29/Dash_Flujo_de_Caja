@@ -13,6 +13,7 @@ import {
   ListChecks,
   Building2,
   CalendarDays,
+  CalendarClock,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/", label: "Resumen", icon: LayoutDashboard },
   { href: "/flujo", label: "Flujo de Caja", icon: Wallet },
+  { href: "/proyectado", label: "Flujo de Caja Proyectado", icon: CalendarClock },
   { href: "/ingresos", label: "Ingresos", icon: TrendingUp },
   { href: "/egresos", label: "Egresos", icon: TrendingDown },
   { href: "/categorias", label: "Categorías", icon: Tags },

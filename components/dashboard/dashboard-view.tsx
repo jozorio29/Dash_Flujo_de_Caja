@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DashboardData, Movement } from "@/lib/types";
 import { buildDashboard } from "@/lib/aggregations";
 import { DashboardFilters, DashboardHeader } from "./header";
@@ -44,15 +44,15 @@ export function DashboardView() {
     to: "",
     cuenta: "all",
   });
-  const [filtersInitialized, setFiltersInitialized] = useState(false);
+  const filtersInitializedRef = useRef(false);
 
-  // Carga inicial: trae todos los movimientos del API
+  // Carga única al montar. Para ver datos nuevos del sheet, recargar la página.
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
         setLoading(true);
-        const res = await fetch("/api/dashboard");
+        const res = await fetch("/api/dashboard", { cache: "no-store" });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || `HTTP ${res.status}`);
@@ -62,14 +62,13 @@ export function DashboardView() {
         const movs = rehydrateMovements(json.movements);
         setAllMovements(movs);
         setAllCuentas(json.meta.cuentas);
-        // Inicializa filtros al rango completo
-        if (!filtersInitialized) {
+        if (!filtersInitializedRef.current) {
           setFilters({
             from: json.meta.fechaInicio ?? "",
             to: json.meta.fechaFin ?? "",
             cuenta: "all",
           });
-          setFiltersInitialized(true);
+          filtersInitializedRef.current = true;
         }
         setError(null);
       } catch (e) {
@@ -82,7 +81,6 @@ export function DashboardView() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Aplica filtros y reconstruye el dashboard
@@ -90,12 +88,12 @@ export function DashboardView() {
     if (!allMovements) return null;
     let movs = allMovements;
     if (filters.from) {
-      const from = parseLocalDate(filters.from); // 00:00:00 hora local
+      const from = parseLocalDate(filters.from);
       movs = movs.filter((m) => m.fecha && m.fecha.getTime() >= from.getTime());
     }
     if (filters.to) {
       const to = parseLocalDate(filters.to);
-      to.setHours(23, 59, 59, 999); // 23:59:59 hora local del día seleccionado
+      to.setHours(23, 59, 59, 999);
       movs = movs.filter((m) => m.fecha && m.fecha.getTime() <= to.getTime());
     }
     if (filters.cuenta !== "all") {

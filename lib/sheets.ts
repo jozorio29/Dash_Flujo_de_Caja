@@ -23,7 +23,8 @@ export async function fetchSheetRows(): Promise<string[][]> {
     range
   )}?key=${apiKey}&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`;
 
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  // Sin cache: cada request lee el sheet fresco para soportar el modo "tiempo real".
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Google Sheets API error ${res.status}: ${body}`);

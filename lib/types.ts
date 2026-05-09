@@ -85,3 +85,54 @@ export interface Insight {
   description: string;
   icon: "trending-down" | "trending-up" | "alert" | "pie";
 }
+
+// ─── FLUJO DE CAJA PROYECTADO ────────────────────────────────────────────────
+//
+// Columnas de la pestaña "Flujo":
+//   A=Fecha | B=Concepto | C=Centro de Costo | D=Edificio | E=Status |
+//   F=Ingresos (Bs) | G=Egresos (Bs) | H=Stand by (Bs) |
+//   I=Saldo en P. Bol (Bs) | J=Monto en USD
+
+export interface ProjectedMovement {
+  fecha: Date | null;
+  fechaRaw: string;
+  concepto: string;
+  centroCosto: string;
+  edificio: string;
+  status: string;
+  ingresos: number;
+  egresos: number;
+  standBy: number;
+  saldoBs: number;
+  montoUsd: number;
+}
+
+export interface ProjectedSummary {
+  totalIngresos: number;
+  totalEgresos: number;
+  totalStandBy: number;
+  netFlow: number; // ingresos - egresos (sin stand by)
+  saldoFinalBs: number;
+  saldoFinalUsd: number;
+  numMovimientos: number;
+  fechaInicio: string | null;
+  fechaFin: string | null;
+}
+
+export interface ProjectedDashboardData {
+  movements: ProjectedMovement[];
+  summary: ProjectedSummary;
+  meta: {
+    statuses: string[]; // valores únicos de Status
+    centrosCosto: string[];
+    edificios: string[];
+  };
+}
+
+/** Punto del gráfico Real vs Proyectado (saldo en Bs por mes). */
+export interface SaldoSeriesPoint {
+  month: string; // yyyy-mm
+  label: string; // "ene 2026"
+  real: number | null; // saldo real al final del mes (null si es futuro)
+  proyectado: number | null; // saldo proyectado al final del mes (null si es pasado)
+}
