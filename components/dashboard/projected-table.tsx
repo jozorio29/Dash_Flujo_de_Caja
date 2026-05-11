@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ProjectedMovement } from "@/lib/types";
-import { formatCurrency, cn } from "@/lib/utils";
+import { formatCurrency, cn, monthKey, monthLabel } from "@/lib/utils";
 import { Search, ChevronDown, ChevronUp } from "lucide-react";
 
 interface Props {
@@ -56,11 +56,24 @@ export function ProjectedTable({
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [centroFilter, setCentroFilter] = useState<string>("all");
   const [edificioFilter, setEdificioFilter] = useState<string>("all");
+  const [monthFilter, setMonthFilter] = useState<string>("all");
   const [sortKey, setSortKey] = useState<SortKey>("fecha");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
+  // Lista única de meses (yyyy-mm) presentes en los movimientos, ordenada cronológicamente.
+  const months = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of movements) {
+      if (m.fecha) set.add(monthKey(m.fecha));
+    }
+    return Array.from(set).sort();
+  }, [movements]);
+
   const filtered = useMemo(() => {
     let out = movements;
+    if (monthFilter !== "all") {
+      out = out.filter((m) => m.fecha && monthKey(m.fecha) === monthFilter);
+    }
     if (statusFilter !== "all") {
       out = out.filter((m) => m.status === statusFilter);
     }
@@ -96,7 +109,7 @@ export function ProjectedTable({
       return String(va).localeCompare(String(vb)) * dir;
     });
     return out;
-  }, [movements, search, statusFilter, centroFilter, edificioFilter, sortKey, sortDir]);
+  }, [movements, search, statusFilter, centroFilter, edificioFilter, monthFilter, sortKey, sortDir]);
 
   const totals = useMemo(() => {
     let ing = 0,
@@ -168,6 +181,19 @@ export function ProjectedTable({
               className="w-56 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-sm shadow-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
           </div>
+
+          <select
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm shadow-sm outline-none focus:border-blue-400"
+          >
+            <option value="all">Todos los meses</option>
+            {months.map((mk) => (
+              <option key={mk} value={mk}>
+                {monthLabel(mk)}
+              </option>
+            ))}
+          </select>
 
           <select
             value={statusFilter}
