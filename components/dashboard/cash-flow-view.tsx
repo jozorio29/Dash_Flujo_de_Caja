@@ -150,14 +150,13 @@ function buildCashFlow(movements: Movement[]): CashFlowComputed {
 
 export function CashFlowView() {
   const [allMovements, setAllMovements] = useState<Movement[] | null>(null);
-  const [allCuentas, setAllCuentas] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [filters, setFilters] = useState<DashboardFilters>({
     from: "",
     to: "",
-    cuenta: "all",
+    moneda: "BOB",
   });
   const filtersInitializedRef = useRef(false);
 
@@ -175,12 +174,11 @@ export function CashFlowView() {
         if (cancelled) return;
         const movs = rehydrate(json.movements);
         setAllMovements(movs);
-        setAllCuentas(json.meta.cuentas);
         if (!filtersInitializedRef.current) {
           setFilters({
             from: json.meta.fechaInicio ?? "",
             to: json.meta.fechaFin ?? "",
-            cuenta: "all",
+            moneda: "BOB",
           });
           filtersInitializedRef.current = true;
         }
@@ -209,9 +207,6 @@ export function CashFlowView() {
       const to = parseLocalDate(filters.to);
       to.setHours(23, 59, 59, 999);
       movs = movs.filter((m) => m.fecha && m.fecha.getTime() <= to.getTime());
-    }
-    if (filters.cuenta !== "all") {
-      movs = movs.filter((m) => m.oficina === filters.cuenta);
     }
     return movs;
   }, [allMovements, filters]);
@@ -267,7 +262,6 @@ export function CashFlowView() {
         onFiltersChange={setFilters}
         minDate={minDate}
         maxDate={maxDate}
-        cuentas={allCuentas}
         filteredCount={filteredMovements.length}
       />
 

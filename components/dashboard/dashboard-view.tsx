@@ -35,14 +35,13 @@ function parseLocalDate(s: string): Date {
 
 export function DashboardView() {
   const [allMovements, setAllMovements] = useState<Movement[] | null>(null);
-  const [allCuentas, setAllCuentas] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [filters, setFilters] = useState<DashboardFilters>({
     from: "",
     to: "",
-    cuenta: "all",
+    moneda: "BOB",
   });
   const filtersInitializedRef = useRef(false);
 
@@ -61,12 +60,11 @@ export function DashboardView() {
         if (cancelled) return;
         const movs = rehydrateMovements(json.movements);
         setAllMovements(movs);
-        setAllCuentas(json.meta.cuentas);
         if (!filtersInitializedRef.current) {
           setFilters({
             from: json.meta.fechaInicio ?? "",
             to: json.meta.fechaFin ?? "",
-            cuenta: "all",
+            moneda: "BOB",
           });
           filtersInitializedRef.current = true;
         }
@@ -95,9 +93,6 @@ export function DashboardView() {
       const to = parseLocalDate(filters.to);
       to.setHours(23, 59, 59, 999);
       movs = movs.filter((m) => m.fecha && m.fecha.getTime() <= to.getTime());
-    }
-    if (filters.cuenta !== "all") {
-      movs = movs.filter((m) => m.oficina === filters.cuenta);
     }
     return buildDashboard(movs);
   }, [allMovements, filters]);
@@ -161,7 +156,6 @@ export function DashboardView() {
         onFiltersChange={setFilters}
         minDate={minDate}
         maxDate={maxDate}
-        cuentas={allCuentas}
         filteredCount={filtered.movements.length}
       />
 
@@ -169,12 +163,12 @@ export function DashboardView() {
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center text-amber-900">
           <p className="font-semibold">Sin movimientos en el período seleccionado</p>
           <p className="mt-1 text-sm">
-            Ajusta el rango de fechas o cambia el filtro de cuenta para ver datos.
+            Ajusta el rango de fechas para ver datos.
           </p>
         </div>
       ) : (
         <>
-          <KpiCards kpis={filtered.kpis} />
+          <KpiCards kpis={filtered.kpis} moneda={filters.moneda} />
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
             <DailyBalanceChart data={filtered.dailyBalances} />
             <MonthlyFlowsChart data={filtered.monthlyFlows} />

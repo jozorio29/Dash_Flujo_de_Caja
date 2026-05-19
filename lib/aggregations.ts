@@ -35,14 +35,36 @@ export function buildDashboard(movements: Movement[]): DashboardData {
   };
 }
 
+/**
+ * Tipo de cambio del row: USD por Bs en el momento de ese movimiento.
+ * Lo calculamos como saldoUsd / saldoBs. Si saldoBs es 0 (movimiento inicial,
+ * división por cero), retornamos 0 — el caller debe manejarlo.
+ */
+function rateAt(m: Movement): number {
+  if (!m.saldo || !m.saldoUsd) return 0;
+  return m.saldoUsd / m.saldo;
+}
+
 function buildKpis(movements: Movement[]): KpiSummary {
   let ingresos = 0;
   let egresos = 0;
+  let ingresosUsd = 0;
+  let egresosUsd = 0;
+
   for (const m of movements) {
     ingresos += m.creditos;
     egresos += m.debitos;
+    // Para USD usamos el tipo de cambio AL MOMENTO de cada movimiento
+    // (porque el rate cambia mes a mes). Esto da una conversión más fiel
+    // que aplicar un rate "promedio" a las sumas en Bs.
+    const r = rateAt(m);
+    if (r > 0) {
+      ingresosUsd += m.creditos * r;
+      egresosUsd += m.debitos * r;
+    }
   }
   const netFlow = ingresos - egresos;
+  const netFlowUsd = ingresosUsd - egresosUsd;
 
   // Saldo inicial = saldo de la primera fila MENOS su movimiento neto
   // (porque el "Saldo" suele ser POST-movimiento)
@@ -50,6 +72,15 @@ function buildKpis(movements: Movement[]): KpiSummary {
   const last = movements[movements.length - 1];
   const saldoInicial = first ? first.saldo - first.monto : 0;
   const saldoFinal = last ? last.saldo : saldoInicial + netFlow;
+
+  // Saldos USD: usamos los valores running de la columna O directamente.
+  // saldoInicialUsd = saldo USD del primer mov - su movimiento en USD.
+  // El "movimiento USD" del primer row se estima con su propio rate.
+  const firstRate = first ? rateAt(first) : 0;
+  const saldoInicialUsd = first
+    ? first.saldoUsd - first.monto * firstRate
+    : 0;
+  const saldoFinalUsd = last ? last.saldoUsd : saldoInicialUsd + netFlowUsd;
 
   // Meses únicos
   const months = new Set<string>();
@@ -67,6 +98,14 @@ function buildKpis(movements: Movement[]): KpiSummary {
     promedioMensualIngresos: ingresos / numMeses,
     promedioMensualEgresos: egresos / numMeses,
     promedioMensualNet: netFlow / numMeses,
+    ingresosTotalesUsd: ingresosUsd,
+    egresosTotalesUsd: egresosUsd,
+    netFlowUsd,
+    saldoInicialUsd,
+    saldoFinalUsd,
+    promedioMensualIngresosUsd: ingresosUsd / numMeses,
+    promedioMensualEgresosUsd: egresosUsd / numMeses,
+    promedioMensualNetUsd: netFlowUsd / numMeses,
     numMeses,
     numMovimientos: movements.length,
   };

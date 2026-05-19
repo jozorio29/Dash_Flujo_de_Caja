@@ -14,7 +14,7 @@ interface SheetsResponse {
 export async function fetchSheetRows(): Promise<string[][]> {
   const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
-  const range = process.env.GOOGLE_SHEETS_RANGE || "Hoja 1!A:N";
+  const range = process.env.GOOGLE_SHEETS_RANGE || "Hoja 1!A:O";
 
   if (!apiKey) throw new Error("GOOGLE_SHEETS_API_KEY no configurada en .env.local");
   if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_SPREADSHEET_ID no configurada en .env.local");
@@ -47,8 +47,7 @@ function findHeaderRowIndex(rows: string[][]): number {
 
 /**
  * Posiciones (0-indexed) en el Google Sheet de las columnas que SÍ usamos.
- * Las columnas B, E, G, H (Hora, Descripción, Cód. Trans., ITF) y O (Adicionales)
- * existen en el sheet pero las ignoramos por completo.
+ * Las columnas B, E, G, H (Hora, Descripción, Cód. Trans., ITF) existen pero las ignoramos.
  *
  *   A=0  Fecha
  *   B=1  (Hora)        ← ignorada
@@ -61,9 +60,10 @@ function findHeaderRowIndex(rows: string[][]): number {
  *   I=8  Tipo
  *   J=9  Concepto P&L
  *   K=10 Desc P&L
- *   L=11 Débitos
- *   M=12 Créditos
- *   N=13 Saldo
+ *   L=11 Débitos (Bs)
+ *   M=12 Créditos (Bs)
+ *   N=13 Saldo (Bs)
+ *   O=14 Saldo (USD)   ← NUEVA: mirror del saldo en dólares
  */
 const COLUMN_INDEX = {
   fecha: 0,
@@ -76,6 +76,7 @@ const COLUMN_INDEX = {
   debitos: 11,
   creditos: 12,
   saldo: 13,
+  saldoUsd: 14,
 } as const;
 
 /**
@@ -130,6 +131,7 @@ export function parseMovements(rows: string[][]): Movement[] {
       debitos,
       creditos,
       saldo: parseAmount(row[COLUMN_INDEX.saldo]),
+      saldoUsd: parseAmount(row[COLUMN_INDEX.saldoUsd]),
       monto: creditos - debitos,
       categoria,
     });

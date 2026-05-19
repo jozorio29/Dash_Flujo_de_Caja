@@ -21,14 +21,18 @@ export interface Movement {
   descPL: string;
   debitos: number;
   creditos: number;
+  /** Saldo running en Bolivianos (post-movimiento). Columna N del sheet. */
   saldo: number;
-  /** Monto neto: créditos - débitos (positivo = ingreso, negativo = egreso) */
+  /** Saldo running en USD (post-movimiento). Columna O del sheet. */
+  saldoUsd: number;
+  /** Monto neto: créditos - débitos (positivo = ingreso, negativo = egreso) en Bs */
   monto: number;
   /** Categoría = Concepto P&L (fallback a Desc P&L o "Otros") */
   categoria: string;
 }
 
 export interface KpiSummary {
+  // ── Bolivianos (Bs) ──
   ingresosTotales: number;
   egresosTotales: number;
   netFlow: number;
@@ -37,6 +41,16 @@ export interface KpiSummary {
   promedioMensualIngresos: number;
   promedioMensualEgresos: number;
   promedioMensualNet: number;
+  // ── USD (mismos KPIs convertidos a dólares) ──
+  ingresosTotalesUsd: number;
+  egresosTotalesUsd: number;
+  netFlowUsd: number;
+  saldoInicialUsd: number;
+  saldoFinalUsd: number;
+  promedioMensualIngresosUsd: number;
+  promedioMensualEgresosUsd: number;
+  promedioMensualNetUsd: number;
+  // ── Meta ──
   numMeses: number;
   numMovimientos: number;
 }

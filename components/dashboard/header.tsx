@@ -1,13 +1,14 @@
 "use client";
 
-import { Calendar, ChevronDown, RotateCcw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Calendar, RotateCcw, Coins } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+export type Moneda = "BOB" | "USD";
 
 export interface DashboardFilters {
   from: string; // yyyy-mm-dd o ""
   to: string;
-  cuenta: string; // "all" o nombre de oficina
+  moneda: Moneda;
 }
 
 interface Props {
@@ -16,7 +17,6 @@ interface Props {
   /** Min/max disponibles en la data (para el input date) */
   minDate?: string | null;
   maxDate?: string | null;
-  cuentas: string[];
   /** Conteo de movimientos en el rango filtrado actual */
   filteredCount?: number;
 }
@@ -77,31 +77,11 @@ export function DashboardHeader({
   onFiltersChange,
   minDate,
   maxDate,
-  cuentas,
   filteredCount,
 }: Props) {
-  const [openCuenta, setOpenCuenta] = useState(false);
-  const cuentaRef = useRef<HTMLDivElement>(null);
-
-  // Cerrar dropdown al click fuera
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (cuentaRef.current && !cuentaRef.current.contains(e.target as Node)) {
-        setOpenCuenta(false);
-      }
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
   const isAllPeriod =
     (!filters.from || filters.from === minDate) &&
     (!filters.to || filters.to === maxDate);
-
-  const cuentaLabel =
-    filters.cuenta === "all"
-      ? `Todas${cuentas.length > 0 ? ` (${cuentas.length})` : ""}`
-      : filters.cuenta;
 
   return (
     <div className="space-y-3">
@@ -157,58 +137,38 @@ export function DashboardHeader({
             </div>
           </div>
 
-          {/* Cuenta */}
-          <div className="relative" ref={cuentaRef}>
-            <button
-              type="button"
-              onClick={() => setOpenCuenta((v) => !v)}
-              className="flex w-full min-w-[160px] flex-col items-start rounded-lg border border-slate-200 bg-white px-3 py-2 text-left shadow-sm hover:bg-slate-50"
-            >
+          {/* Moneda — toggle BOB / USD */}
+          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <Coins className="h-3 w-3 text-slate-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                Cuenta
+                Moneda
               </span>
-              <span className="mt-1 flex w-full items-center justify-between gap-2 text-sm font-medium text-slate-800">
-                <span className="truncate">{cuentaLabel}</span>
-                <ChevronDown
-                  className={cn(
-                    "h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform",
-                    openCuenta && "rotate-180"
-                  )}
-                />
-              </span>
-            </button>
-            {openCuenta && (
-              <div className="absolute right-0 z-20 mt-1 w-full min-w-[200px] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                <button
-                  className={cn(
-                    "flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-slate-50",
-                    filters.cuenta === "all" && "bg-blue-50 font-semibold text-blue-700"
-                  )}
-                  onClick={() => {
-                    onFiltersChange({ ...filters, cuenta: "all" });
-                    setOpenCuenta(false);
-                  }}
-                >
-                  <span>Todas</span>
-                  <span className="text-xs text-slate-400">{cuentas.length}</span>
-                </button>
-                {cuentas.map((c) => (
-                  <button
-                    key={c}
-                    className={cn(
-                      "block w-full px-3 py-1.5 text-left text-sm hover:bg-slate-50",
-                      filters.cuenta === c && "bg-blue-50 font-semibold text-blue-700"
-                    )}
-                    onClick={() => {
-                      onFiltersChange({ ...filters, cuenta: c });
-                      setOpenCuenta(false);
-                    }}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            )}
+            </div>
+            <div className="mt-1 inline-flex rounded-md bg-slate-100 p-0.5">
+              <button
+                onClick={() => onFiltersChange({ ...filters, moneda: "BOB" })}
+                className={cn(
+                  "rounded px-3 py-1 text-xs font-semibold tabular-nums transition-colors",
+                  filters.moneda === "BOB"
+                    ? "bg-white text-blue-700 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Bs
+              </button>
+              <button
+                onClick={() => onFiltersChange({ ...filters, moneda: "USD" })}
+                className={cn(
+                  "rounded px-3 py-1 text-xs font-semibold tabular-nums transition-colors",
+                  filters.moneda === "USD"
+                    ? "bg-white text-emerald-700 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                USD
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -234,13 +194,13 @@ export function DashboardHeader({
             </button>
           );
         })}
-        {(filters.cuenta !== "all" || !isAllPeriod) && (
+        {!isAllPeriod && (
           <button
             onClick={() =>
               onFiltersChange({
+                ...filters,
                 from: minDate ?? "",
                 to: maxDate ?? "",
-                cuenta: "all",
               })
             }
             className="ml-1 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50"

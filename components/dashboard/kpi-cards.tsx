@@ -3,43 +3,59 @@
 import { ArrowDownRight, ArrowUpRight, Wallet, Database, Coins } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { KpiSummary } from "@/lib/types";
-import { formatCurrency } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
+import type { Moneda } from "./header";
 
 interface Props {
   kpis: KpiSummary;
+  moneda: Moneda;
 }
 
-export function KpiCards({ kpis }: Props) {
+export function KpiCards({ kpis, moneda }: Props) {
+  // Selectores: dependiendo de la moneda, leemos los campos en Bs o USD
+  const isUsd = moneda === "USD";
+  const ingresos = isUsd ? kpis.ingresosTotalesUsd : kpis.ingresosTotales;
+  const egresos = isUsd ? kpis.egresosTotalesUsd : kpis.egresosTotales;
+  const netFlow = isUsd ? kpis.netFlowUsd : kpis.netFlow;
+  const saldoInicial = isUsd ? kpis.saldoInicialUsd : kpis.saldoInicial;
+  const saldoFinal = isUsd ? kpis.saldoFinalUsd : kpis.saldoFinal;
+  const promIng = isUsd ? kpis.promedioMensualIngresosUsd : kpis.promedioMensualIngresos;
+  const promEgr = isUsd ? kpis.promedioMensualEgresosUsd : kpis.promedioMensualEgresos;
+  const promNet = isUsd ? kpis.promedioMensualNetUsd : kpis.promedioMensualNet;
+
+  // Formato según moneda: USD usa "$" con 2 decimales, Bs usa "Bs " con 0 decimales.
+  const fmt = (v: number) =>
+    isUsd ? formatCurrency(v, { symbol: "$", decimals: 2 }) : formatCurrency(v, { symbol: "Bs " });
+
   const cards = [
     {
       title: "Ingresos Totales",
-      value: kpis.ingresosTotales,
-      sub: `Promedio mensual\n${formatCurrency(kpis.promedioMensualIngresos)}`,
+      value: ingresos,
+      sub: `Promedio mensual\n${fmt(promIng)}`,
       Icon: ArrowUpRight,
       iconBg: "bg-blue-50 text-blue-600",
       titleClass: "text-blue-600",
     },
     {
       title: "Egresos Totales",
-      value: kpis.egresosTotales,
-      sub: `Promedio mensual\n${formatCurrency(kpis.promedioMensualEgresos)}`,
+      value: egresos,
+      sub: `Promedio mensual\n${fmt(promEgr)}`,
       Icon: ArrowDownRight,
       iconBg: "bg-rose-50 text-rose-600",
       titleClass: "text-rose-600",
     },
     {
       title: "Net Flow (ING - EGR)",
-      value: kpis.netFlow,
-      sub: `Promedio mensual\n${formatCurrency(kpis.promedioMensualNet)}`,
+      value: netFlow,
+      sub: `Promedio mensual\n${fmt(promNet)}`,
       Icon: Wallet,
       iconBg: "bg-emerald-50 text-emerald-600",
-      titleClass: kpis.netFlow >= 0 ? "text-emerald-600" : "text-rose-600",
-      negative: kpis.netFlow < 0,
+      titleClass: netFlow >= 0 ? "text-emerald-600" : "text-rose-600",
+      negative: netFlow < 0,
     },
     {
       title: "Saldo Inicial",
-      value: kpis.saldoInicial,
+      value: saldoInicial,
       sub: "Inicio del período",
       Icon: Database,
       iconBg: "bg-violet-50 text-violet-600",
@@ -47,7 +63,7 @@ export function KpiCards({ kpis }: Props) {
     },
     {
       title: "Saldo Final",
-      value: kpis.saldoFinal,
+      value: saldoFinal,
       sub: "Fin del período",
       Icon: Coins,
       iconBg: "bg-slate-100 text-slate-700",
@@ -69,9 +85,9 @@ export function KpiCards({ kpis }: Props) {
                   "mt-1 truncate text-2xl font-bold tabular-nums",
                   c.negative ? "text-rose-600" : "text-slate-900"
                 )}
-                title={formatCurrency(c.value)}
+                title={fmt(c.value)}
               >
-                {formatCurrency(c.value)}
+                {fmt(c.value)}
               </div>
               {c.sub && (
                 <div className="mt-2 whitespace-pre-line text-[11px] leading-tight text-slate-500">
