@@ -23,7 +23,6 @@ interface Props {
 
 const PRESETS: { id: string; label: string }[] = [
   { id: "all", label: "Todo" },
-  { id: "ytd", label: "YTD" },
   { id: "mtd", label: "Este mes" },
   { id: "last30", label: "Últimos 30d" },
   { id: "lastMonth", label: "Mes anterior" },
