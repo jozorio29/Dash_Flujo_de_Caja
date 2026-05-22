@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { DashboardData, Movement } from "@/lib/types";
 import { DashboardFilters, DashboardHeader } from "./header";
+import { dateKey, parseApiDate } from "@/lib/utils";
 import { CashFlowStatement, type CashFlowLine } from "./cash-flow-statement";
 import { CashFlowWaterfall, type WaterfallStep } from "./cash-flow-waterfall";
 
 function rehydrate(raw: any[]): Movement[] {
-  return raw.map((m) => ({ ...m, fecha: m.fecha ? new Date(m.fecha) : null }));
+  return raw.map((m) => ({ ...m, fecha: parseApiDate(m.fecha) }));
 }
 
 function parseLocalDate(s: string): Date {
@@ -143,8 +144,8 @@ function buildCashFlow(movements: Movement[]): CashFlowComputed {
     ingresosLines,
     egresosLines,
     waterfallSteps: steps,
-    fechaInicio: first.fecha?.toISOString().slice(0, 10) ?? null,
-    fechaFin: last.fecha?.toISOString().slice(0, 10) ?? null,
+    fechaInicio: first.fecha ? dateKey(first.fecha) : null,
+    fechaFin: last.fecha ? dateKey(last.fecha) : null,
   };
 }
 

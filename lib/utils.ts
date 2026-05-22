@@ -103,11 +103,11 @@ export function parseDate(raw: string | number | null | undefined): Date | null 
 
   // Google Sheets serial date (cuando viene UNFORMATTED_VALUE como número)
   if (typeof raw === "number" && raw > 0 && raw < 100000) {
-    // Serial epoch: 1899-12-30 (incluye el bug de Lotus 1-2-3 sobre 1900)
-    const epoch = new Date(Date.UTC(1899, 11, 30));
-    const ms = raw * 24 * 60 * 60 * 1000;
-    const d = new Date(epoch.getTime() + ms);
-    return isNaN(d.getTime()) ? null : d;
+    // Google Sheets serial date: calcular el calendario en UTC, pero devolver
+    // un Date local para que getDate/getMonth no se corran por zona horaria.
+    const epoch = Date.UTC(1899, 11, 30);
+    const d = new Date(epoch + raw * 24 * 60 * 60 * 1000);
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
   }
 
   const s = String(raw).trim();
@@ -124,6 +124,14 @@ export function parseDate(raw: string | number | null | undefined): Date | null 
     return isNaN(d.getTime()) ? null : d;
   }
 
+  // yyyy-mm-dd como fecha local. `new Date("yyyy-mm-dd")` se interpreta como
+  // UTC y puede mover el día hacia atrás en América.
+  const ymd = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (ymd) {
+    const d = new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
   // Si es un número en string ("45292"), intenta como serial
   if (/^\d+(\.\d+)?$/.test(s)) {
     const n = parseFloat(s);
@@ -135,6 +143,25 @@ export function parseDate(raw: string | number | null | undefined): Date | null 
   // yyyy-mm-dd o ISO
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
+}
+
+export function dateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+}
+
+export function parseApiDate(raw: string | Date | null | undefined): Date | null {
+  if (!raw) return null;
+  if (raw instanceof Date) return new Date(raw.getFullYear(), raw.getMonth(), raw.getDate());
+
+  const s = String(raw);
+  const ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) {
+    return new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10));
+  }
+
+  return parseDate(s);
 }
 
 export function monthKey(date: Date): string {

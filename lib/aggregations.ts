@@ -7,7 +7,7 @@ import {
   MonthlyFlow,
   Movement,
 } from "./types";
-import { monthKey, monthLabel, formatCurrency } from "./utils";
+import { dateKey, monthKey, monthLabel, formatCurrency } from "./utils";
 
 export function buildDashboard(movements: Movement[]): DashboardData {
   const valid = movements.filter((m) => m.fecha !== null);
@@ -115,7 +115,7 @@ function buildDailyBalances(movements: Movement[]): DailyBalance[] {
   const byDate = new Map<string, { saldo: number; ingresos: number; egresos: number }>();
   for (const m of movements) {
     if (!m.fecha) continue;
-    const key = m.fecha.toISOString().slice(0, 10);
+    const key = dateKey(m.fecha);
     const cur = byDate.get(key) ?? { saldo: 0, ingresos: 0, egresos: 0 };
     cur.saldo = m.saldo; // último saldo del día
     cur.ingresos += m.creditos;

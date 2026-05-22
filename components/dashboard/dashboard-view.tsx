@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DashboardData, Movement } from "@/lib/types";
 import { buildDashboard } from "@/lib/aggregations";
+import { parseApiDate } from "@/lib/utils";
 import { DashboardFilters, DashboardHeader } from "./header";
 import { KpiCards } from "./kpi-cards";
 import { DailyBalanceChart } from "./daily-balance-chart";
@@ -19,7 +20,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 function rehydrateMovements(raw: any[]): Movement[] {
   return raw.map((m) => ({
     ...m,
-    fecha: m.fecha ? new Date(m.fecha) : null,
+    fecha: parseApiDate(m.fecha),
   }));
 }
 

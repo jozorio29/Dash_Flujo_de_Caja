@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { ProjectedDashboardData, ProjectedMovement } from "@/lib/types";
+import { parseApiDate } from "@/lib/utils";
 import { ProyectadoFilters, type ProjectedFilters } from "./proyectado-filters";
 import { ProyectadoTable } from "./proyectado-table";
 import { ProyectadoSummary } from "./proyectado-summary";
 
 function rehydrate(raw: any[]): ProjectedMovement[] {
-  return raw.map((m) => ({ ...m, fecha: m.fecha ? new Date(m.fecha) : null }));
+  return raw.map((m) => ({ ...m, fecha: parseApiDate(m.fecha) }));
 }
 
 function parseLocalDate(s: string): Date {

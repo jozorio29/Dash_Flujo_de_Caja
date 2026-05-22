@@ -8,7 +8,7 @@ import {
   ProjectedMovement,
   SaldoSeriesPoint,
 } from "@/lib/types";
-import { monthKey, monthLabel, formatCurrency } from "@/lib/utils";
+import { monthKey, monthLabel, formatCurrency, parseApiDate } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { SaldoRealVsProyectadoChart } from "./saldo-real-vs-proyectado-chart";
 import { ProjectedTable } from "./projected-table";
@@ -16,7 +16,12 @@ import { Loader2, AlertTriangle, ArrowUpRight, ArrowDownRight, Wallet, Clock } f
 
 /** Rehidrata fechas (Date) que viajaron como string por JSON. */
 function rehydrate<T extends { fecha: any }>(arr: T[]): T[] {
-  return arr.map((m) => ({ ...m, fecha: m.fecha ? new Date(m.fecha) : null }));
+  return arr.map((m) => ({ ...m, fecha: parseApiDate(m.fecha) }));
+}
+
+function formatApiDay(raw: string): string {
+  const d = parseApiDate(raw);
+  return d ? d.toLocaleDateString("es-PE") : raw;
 }
 
 /** Saldo final por mes en una serie de movimientos con campo `saldo`. */
@@ -161,8 +166,7 @@ export function ProjectedView() {
           {summary.fechaInicio && summary.fechaFin && (
             <>
               {" "}
-              período {new Date(summary.fechaInicio).toLocaleDateString("es-PE")} →{" "}
-              {new Date(summary.fechaFin).toLocaleDateString("es-PE")}
+              período {formatApiDay(summary.fechaInicio)} → {formatApiDay(summary.fechaFin)}
             </>
           )}
         </p>
