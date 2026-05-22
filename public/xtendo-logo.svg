@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 143 104" role="img" aria-label="Xtendo">
+  <defs>
+    <clipPath id="globe">
+      <circle cx="53" cy="52" r="36" />
+    </clipPath>
+    <pattern id="dots" width="5.5" height="5.5" patternUnits="userSpaceOnUse">
+      <circle cx="1.7" cy="1.7" r="1.35" fill="#bfc2c4" />
+    </pattern>
+    <linearGradient id="xBlue" x1="67" y1="76" x2="126" y2="29" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00a9e8" />
+      <stop offset="1" stop-color="#28b8f4" />
+    </linearGradient>
+  </defs>
+
+  <rect width="143" height="104" fill="#f2f2f2" />
+
+  <circle cx="53" cy="52" r="36" fill="#d7d8d8" />
+  <g clip-path="url(#globe)" opacity=".95">
+    <rect x="17" y="16" width="72" height="72" fill="url(#dots)" />
+    <path
+      fill="#f2f2f2"
+      d="M25 40c4-11 11-17 22-20 7-2 16-1 24 4-10 2-15 7-17 15-2 7-1 14 4 21 5 8 13 13 22 15-10 10-26 15-42 9-16-6-25-22-22-39 2 0 5-2 9-5Z"
+      opacity=".62"
+    />
+    <path
+      fill="#f2f2f2"
+      d="M39 22c-4 8-2 16 6 22 6 5 14 7 24 6-3 7-10 12-21 14-12 2-23-1-31-9 1-13 9-26 22-33Z"
+      opacity=".45"
+    />
+  </g>
+
+  <path
+    fill="url(#xBlue)"
+    d="M85.8 29.4h23.8L94.9 48.8l25.8 27H96.4L82.7 60.3 69.2 75.8H45.4l24.8-27.3-23.1-19.1h24.2l11.8 10.9 2.7-10.9Z"
+  />
+</svg>

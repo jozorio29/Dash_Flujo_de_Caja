@@ -11,7 +11,6 @@ import {
   Tags,
   CalendarRange,
   ListChecks,
-  Building2,
   CalendarDays,
   CalendarClock,
   LogOut,
@@ -36,8 +35,8 @@ export function Sidebar() {
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-800/40 bg-[#0B1B3B] text-slate-200 md:flex">
       <div className="flex h-24 items-center gap-3 px-6 pt-2">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600/90 shadow-lg shadow-blue-900/40">
-          <Building2 className="h-6 w-6 text-white" />
+        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-[#f2f2f2] shadow-lg shadow-blue-900/40">
+          <img src="/xtendo-logo.svg" alt="Xtendo" className="h-full w-full object-contain" />
         </div>
         <div className="leading-tight">
           <div className="text-sm font-semibold text-white">Xtendo</div>

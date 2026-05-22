@@ -3,7 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { Building2, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 function LoginContent() {
   const params = useSearchParams();
@@ -21,8 +21,8 @@ function LoginContent() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl ring-1 ring-slate-200">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-200">
-            <Building2 className="h-7 w-7" />
+          <div className="mb-4 flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-[#f2f2f2] shadow-lg shadow-blue-200">
+            <img src="/xtendo-logo.svg" alt="Xtendo" className="h-full w-full object-contain" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Flujo de Caja
