@@ -2,9 +2,10 @@
  * Tipos del dominio del dashboard de flujo de caja.
  *
  * Columnas del Google Sheet usadas (solo las que el usuario considera relevantes):
- *   A=Fecha | C=Mes | D=Oficina | F=Referencia | I=Tipo |
- *   J=Concepto P&L | K=Desc P&L | L=Débitos | M=Créditos | N=Saldo
- * Las columnas B (Hora), E (Descripción), G (Cód. Trans.), H (ITF) y O (Adicionales)
+ *   A=Fecha | B=Hora | C=Mes | D=Oficina | F=Referencia | I=Tipo |
+ *   J=Concepto P&L | K=Desc P&L | M=Débitos | N=Créditos |
+ *   O=Saldo Bs | S=Saldo USD
+ * Las columnas E (Descripción), G (Cód. Trans.), H (ITF), L, P, Q y R
  * NO se usan en el dashboard.
  */
 
@@ -13,6 +14,9 @@ export type MovementType = "INGRESO" | "EGRESO" | "OTRO";
 export interface Movement {
   fecha: Date | null;
   fechaRaw: string;
+  horaRaw: string;
+  /** Fecha + hora normalizada para ordenar movimientos del mismo día. */
+  fechaHoraMs: number;
   mes: string;
   oficina: string;
   referencia: string;

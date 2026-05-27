@@ -7,20 +7,25 @@ import {
   LayoutDashboard,
   TrendingUp,
   TrendingDown,
-  Wallet,
   Tags,
   CalendarRange,
   ListChecks,
   CalendarDays,
-  CalendarClock,
+  TableProperties,
+  Sheet,
   LogOut,
+  PanelLeftClose,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/", label: "Resumen", icon: LayoutDashboard },
-  { href: "/flujo", label: "Flujo de Caja", icon: Wallet },
-  { href: "/proyectado", label: "Flujo de Caja Proyectado", icon: CalendarClock },
+  { href: "/flujo-caja-real", label: "Flujo de Caja", icon: Sheet },
+  {
+    href: "/flujo-mensual",
+    label: "Flujo de Caja Proyectado",
+    icon: TableProperties,
+  },
   { href: "/ingresos", label: "Ingresos", icon: TrendingUp },
   { href: "/egresos", label: "Egresos", icon: TrendingDown },
   { href: "/categorias", label: "Categorías", icon: Tags },
@@ -28,22 +33,37 @@ const NAV = [
   { href: "/movimientos", label: "Detalle de Movimientos", icon: ListChecks },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onHide }: { onHide: () => void }) {
   const pathname = usePathname();
   // const { data: session } = useSession();
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-800/40 bg-[#0B1B3B] text-slate-200 md:flex">
-      <div className="flex h-24 items-center gap-3 px-6 pt-2">
-        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-[#f2f2f2] shadow-lg shadow-blue-900/40">
-          <img src="/xtendo-logo.svg" alt="Xtendo" className="h-full w-full object-contain" />
-        </div>
-        <div className="leading-tight">
-          <div className="text-sm font-semibold text-white">Xtendo</div>
-          <div className="text-[11px] uppercase tracking-wider text-slate-400">
-            Flujo de Caja
+      <div className="flex h-24 items-center justify-between gap-3 px-5 pt-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#f2f2f2] shadow-lg shadow-blue-900/40">
+            <img
+              src="/xtendo-logo.svg"
+              alt="Xtendo"
+              className="h-full w-full object-contain"
+            />
+          </div>
+          <div className="min-w-0 leading-tight">
+            <div className="text-sm font-semibold text-white">Xtendo</div>
+            <div className="text-[11px] uppercase tracking-wider text-slate-400">
+              Flujo de Caja
+            </div>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={onHide}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Ocultar menú lateral"
+          title="Ocultar menú lateral"
+        >
+          <PanelLeftClose className="h-5 w-5" />
+        </button>
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-2">
@@ -58,13 +78,15 @@ export function Sidebar() {
                 "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active
                   ? "bg-blue-600/15 text-blue-200 ring-1 ring-blue-500/40"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white"
+                  : "text-slate-300 hover:bg-white/5 hover:text-white",
               )}
             >
               <Icon
                 className={cn(
                   "h-4 w-4",
-                  active ? "text-blue-300" : "text-slate-400 group-hover:text-slate-200"
+                  active
+                    ? "text-blue-300"
+                    : "text-slate-400 group-hover:text-slate-200",
                 )}
               />
               {item.label}

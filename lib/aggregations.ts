@@ -73,7 +73,7 @@ function buildKpis(movements: Movement[]): KpiSummary {
   const saldoInicial = first ? first.saldo - first.monto : 0;
   const saldoFinal = last ? last.saldo : saldoInicial + netFlow;
 
-  // Saldos USD: usamos los valores running de la columna O directamente.
+  // Saldos USD: usamos los valores running de la columna S directamente.
   // saldoInicialUsd = saldo USD del primer mov - su movimiento en USD.
   // El "movimiento USD" del primer row se estima con su propio rate.
   const firstRate = first ? rateAt(first) : 0;
