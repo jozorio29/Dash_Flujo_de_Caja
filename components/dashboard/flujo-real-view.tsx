@@ -264,7 +264,7 @@ export function FlujoRealView() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-            FLUJO DE CAJA REAL
+            Europe Intelligence Suc. Bolivia
           </h1>
           <p className="mt-1 text-sm font-semibold uppercase tracking-wider text-blue-700">
             Estado mensual por cuenta

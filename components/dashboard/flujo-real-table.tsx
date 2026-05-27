@@ -147,7 +147,7 @@ export function FlujoRealTable({ data, moneda, title }: Props) {
       {/* Título grande estilo Excel */}
       <div className="border-b border-slate-200 bg-gradient-to-b from-blue-50/40 to-white px-6 py-4 text-center">
         <h2 className="text-2xl font-bold tracking-tight text-blue-700">
-          {title ?? `Flujo de caja Europe Intelligence Suc. Bolivia — ${data.year}`}
+          {title ?? `Flujo de caja — ${data.year}`}
         </h2>
       </div>
 
