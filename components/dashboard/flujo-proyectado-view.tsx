@@ -127,8 +127,8 @@ function buildProjectedMatrix(
     const monthIdx = m.fecha.getMonth();
     const label = m.conceptoPL || m.concepto || m.centroCosto || "Proyección sin concepto";
     const detail = m.descPL || m.detallePL || label;
-    const creditos = moneda === "USD" ? (m.ingresos > 0 ? Math.abs(m.montoUsd) : 0) : m.ingresos;
-    const debitos = moneda === "USD" ? (m.egresos > 0 ? Math.abs(m.montoUsd) : 0) : m.egresos;
+    const creditos = moneda === "USD" ? m.creditoUsd : m.ingresos;
+    const debitos = moneda === "USD" ? m.debitoUsd : m.egresos;
     if (creditos === 0 && debitos === 0) continue;
     addMovement(label, detail, monthIdx, creditos, debitos, undefined, true);
   }
@@ -160,8 +160,10 @@ function buildProjectedMatrix(
   const projectedSaldoPorMes = empty12();
 
   for (const m of projectedOfYear) {
-    if (!m.fecha || !m.saldoBs) continue;
-    projectedSaldoPorMes[m.fecha.getMonth()] = moneda === "USD" ? m.montoUsd : m.saldoBs;
+    if (!m.fecha) continue;
+    const saldo = moneda === "USD" ? m.saldoUsd : m.saldoBs;
+    if (!saldo) continue;
+    projectedSaldoPorMes[m.fecha.getMonth()] = saldo;
   }
 
   for (let monthIdx = 0; monthIdx < 12; monthIdx++) {

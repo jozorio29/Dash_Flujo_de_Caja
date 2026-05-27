@@ -87,6 +87,8 @@ const COL = {
  *   Q=16 Débito USD
  *   R=17 Crédito USD
  *   S=18 Saldo USD
+ *   T=19 TC por fila (opcional)
+ *   U=20 TC global si T1 contiene "TC" (opcional)
  */
 const REAL_FORMAT_COL = {
   fecha: 0,
@@ -99,6 +101,8 @@ const REAL_FORMAT_COL = {
   debitoUsd: 16,
   creditoUsd: 17,
   saldoUsd: 18,
+  tipoCambio: 19,
+  tipoCambioValue: 20,
 } as const;
 
 function looksLikeRealFormat(row: string[]): boolean {
@@ -115,6 +119,11 @@ function looksLikeRealFormat(row: string[]): boolean {
 export function parseProjectedMovements(rows: string[][]): ProjectedMovement[] {
   if (!rows.length) return [];
   const headerIdx = findHeaderRowIndex(rows);
+  const headerRow = rows[headerIdx] ?? [];
+  const globalTipoCambio =
+    /^tc$/i.test(String(headerRow[REAL_FORMAT_COL.tipoCambio] ?? "").trim())
+      ? parseAmount(headerRow[REAL_FORMAT_COL.tipoCambioValue])
+      : parseAmount(headerRow[REAL_FORMAT_COL.tipoCambio]);
   const dataRows = rows.slice(headerIdx + 1);
 
   const out: ProjectedMovement[] = [];
@@ -129,8 +138,16 @@ export function parseProjectedMovements(rows: string[][]): ProjectedMovement[] {
       const debitos = parseAmount(row[REAL_FORMAT_COL.debitos]);
       const creditos = parseAmount(row[REAL_FORMAT_COL.creditos]);
       const saldo = parseAmount(row[REAL_FORMAT_COL.saldo]);
-      const debitoUsd = parseAmount(row[REAL_FORMAT_COL.debitoUsd]);
-      const creditoUsd = parseAmount(row[REAL_FORMAT_COL.creditoUsd]);
+      const tipoCambio =
+        parseAmount(row[REAL_FORMAT_COL.tipoCambio]) ||
+        parseAmount(row[REAL_FORMAT_COL.tipoCambioValue]) ||
+        globalTipoCambio;
+      const debitoUsd =
+        parseAmount(row[REAL_FORMAT_COL.debitoUsd]) ||
+        (tipoCambio > 0 ? debitos / tipoCambio : 0);
+      const creditoUsd =
+        parseAmount(row[REAL_FORMAT_COL.creditoUsd]) ||
+        (tipoCambio > 0 ? creditos / tipoCambio : 0);
       const saldoUsd = parseAmount(row[REAL_FORMAT_COL.saldoUsd]);
 
       if (!parsedFecha && debitos === 0 && creditos === 0) continue;
@@ -154,6 +171,10 @@ export function parseProjectedMovements(rows: string[][]): ProjectedMovement[] {
         egresos: debitos,
         standBy: 0,
         saldoBs: saldo,
+        debitoUsd,
+        creditoUsd,
+        saldoUsd,
+        tipoCambio,
         montoUsd: saldoUsd || creditoUsd - debitoUsd,
       });
       continue;
@@ -201,6 +222,10 @@ export function parseProjectedMovements(rows: string[][]): ProjectedMovement[] {
       egresos,
       standBy,
       saldoBs,
+      debitoUsd: montoUsd < 0 ? Math.abs(montoUsd) : 0,
+      creditoUsd: montoUsd > 0 ? montoUsd : 0,
+      saldoUsd: 0,
+      tipoCambio: 0,
       montoUsd,
     });
   }

@@ -113,7 +113,8 @@ export interface Insight {
 //
 //   Formato recomendado A:S, igual al consolidado:
 //   A=Fecha | F=Referencia | K=Concepto P&L | L=Desc P&L |
-//   M=Débitos | N=Créditos | Q=Débito USD | R=Crédito USD
+//   M=Débitos | N=Créditos | Q=Débito USD | R=Crédito USD |
+//   S=Saldo USD | T/U=TC
 
 export interface ProjectedMovement {
   fecha: Date | null;
@@ -129,6 +130,10 @@ export interface ProjectedMovement {
   egresos: number;
   standBy: number;
   saldoBs: number;
+  debitoUsd: number;
+  creditoUsd: number;
+  saldoUsd: number;
+  tipoCambio: number;
   montoUsd: number;
 }
 
