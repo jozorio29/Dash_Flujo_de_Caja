@@ -47,7 +47,7 @@ function findHeaderRowIndex(rows: string[][]): number {
 
 /**
  * Posiciones (0-indexed) en el Google Sheet de las columnas que SÍ usamos.
- * Las columnas E, G, H, L, P, Q, R existen pero las ignoramos.
+ * Las columnas E, G, H, P, Q, R existen pero las ignoramos.
  *
  *   A=0  Fecha
  *   B=1  Hora
@@ -60,7 +60,7 @@ function findHeaderRowIndex(rows: string[][]): number {
  *   I=8  Tipo
  *   J=9  Concepto P&L
  *   K=10 Desc P&L
- *   L=11 (ignorada)
+ *   L=11 Detalle P&L
  *   M=12 Débitos (Bs)
  *   N=13 Créditos (Bs)
  *   O=14 Saldo (Bs)
@@ -75,6 +75,7 @@ const COLUMN_INDEX = {
   tipo: 8,
   conceptoPL: 9,
   descPL: 10,
+  detallePL: 11,
   debitos: 12,
   creditos: 13,
   saldo: 14,
@@ -153,6 +154,7 @@ export function parseMovements(rows: string[][]): Movement[] {
 
     const conceptoPL = String(row[COLUMN_INDEX.conceptoPL] ?? "").trim();
     const descPL = String(row[COLUMN_INDEX.descPL] ?? "").trim();
+    const detallePL = String(row[COLUMN_INDEX.detallePL] ?? "").trim();
     const categoria = conceptoPL || descPL || "Otros";
 
     movements.push({
@@ -166,6 +168,7 @@ export function parseMovements(rows: string[][]): Movement[] {
       tipo,
       conceptoPL,
       descPL,
+      detallePL,
       debitos,
       creditos,
       saldo: parseAmount(row[COLUMN_INDEX.saldo]),

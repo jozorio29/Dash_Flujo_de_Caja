@@ -18,7 +18,7 @@ interface SheetsResponse {
 export async function fetchProyectadoRows(): Promise<string[][]> {
   const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
-  const range = process.env.PROYECTADO_RANGE || "Flujo!A:J";
+  const range = process.env.PROYECTADO_RANGE || "Proyecciones!A:S";
 
   if (!apiKey) throw new Error("GOOGLE_SHEETS_API_KEY no configurada en .env.local");
   if (!spreadsheetId)
@@ -50,7 +50,7 @@ function findHeaderRowIndex(rows: string[][]): number {
 }
 
 /**
- * Posiciones (0-indexed) de las 10 columnas del flujo proyectado.
+ * Posiciones (0-indexed) del formato simple A:J del flujo proyectado.
  *   A=0 Fecha
  *   B=1 Concepto
  *   C=2 Centro de Costo
@@ -75,6 +75,43 @@ const COL = {
   montoUsd: 9,
 } as const;
 
+/**
+ * Posiciones (0-indexed) del formato recomendado A:S, igual al consolidado real.
+ *   A=0 Fecha
+ *   F=5 Referencia
+ *   K=10 Concepto P&L
+ *   L=11 Desc P&L
+ *   M=12 Débitos / Egresos
+ *   N=13 Créditos / Ingresos
+ *   O=14 Saldo
+ *   Q=16 Débito USD
+ *   R=17 Crédito USD
+ *   S=18 Saldo USD
+ */
+const REAL_FORMAT_COL = {
+  fecha: 0,
+  referencia: 5,
+  conceptoPL: 10,
+  descPL: 11,
+  debitos: 12,
+  creditos: 13,
+  saldo: 14,
+  debitoUsd: 16,
+  creditoUsd: 17,
+  saldoUsd: 18,
+} as const;
+
+function looksLikeRealFormat(row: string[]): boolean {
+  return (
+    row.length > REAL_FORMAT_COL.creditos &&
+    (
+      String(row[REAL_FORMAT_COL.conceptoPL] ?? "").trim() !== "" ||
+      parseAmount(row[REAL_FORMAT_COL.debitos]) !== 0 ||
+      parseAmount(row[REAL_FORMAT_COL.creditos]) !== 0
+    )
+  );
+}
+
 export function parseProjectedMovements(rows: string[][]): ProjectedMovement[] {
   if (!rows.length) return [];
   const headerIdx = findHeaderRowIndex(rows);
@@ -83,6 +120,44 @@ export function parseProjectedMovements(rows: string[][]): ProjectedMovement[] {
   const out: ProjectedMovement[] = [];
   for (const row of dataRows) {
     if (!row || row.length === 0) continue;
+
+    if (looksLikeRealFormat(row)) {
+      const fechaRaw = String(row[REAL_FORMAT_COL.fecha] ?? "").trim();
+      const parsedFecha = parseDate(row[REAL_FORMAT_COL.fecha] as any);
+      const conceptoPL = String(row[REAL_FORMAT_COL.conceptoPL] ?? "").trim();
+      const descPL = String(row[REAL_FORMAT_COL.descPL] ?? "").trim();
+      const debitos = parseAmount(row[REAL_FORMAT_COL.debitos]);
+      const creditos = parseAmount(row[REAL_FORMAT_COL.creditos]);
+      const saldo = parseAmount(row[REAL_FORMAT_COL.saldo]);
+      const debitoUsd = parseAmount(row[REAL_FORMAT_COL.debitoUsd]);
+      const creditoUsd = parseAmount(row[REAL_FORMAT_COL.creditoUsd]);
+      const saldoUsd = parseAmount(row[REAL_FORMAT_COL.saldoUsd]);
+
+      if (!parsedFecha && debitos === 0 && creditos === 0) continue;
+      if (/^(total|subtotal|saldo)/i.test(fechaRaw)) continue;
+      if (!parsedFecha) continue;
+
+      const concepto = conceptoPL || descPL || String(row[REAL_FORMAT_COL.referencia] ?? "").trim();
+      const detalle = descPL || concepto;
+
+      out.push({
+        fecha: parsedFecha,
+        fechaRaw,
+        concepto,
+        conceptoPL: concepto,
+        descPL: detalle,
+        detallePL: detalle,
+        centroCosto: "",
+        edificio: "",
+        status: "",
+        ingresos: creditos,
+        egresos: debitos,
+        standBy: 0,
+        saldoBs: saldo,
+        montoUsd: saldoUsd || creditoUsd - debitoUsd,
+      });
+      continue;
+    }
 
     const concepto = String(row[COL.concepto] ?? "").trim();
     const ingresos = parseAmount(row[COL.ingresos]);
@@ -95,11 +170,12 @@ export function parseProjectedMovements(rows: string[][]): ProjectedMovement[] {
 
     // Saltar filas separadoras tipo "Pagos proyectados" (sin fecha y sin montos)
     if (
-      !parsedFecha &&
+      (!parsedFecha || !concepto) &&
       ingresos === 0 &&
       egresos === 0 &&
       standBy === 0 &&
-      saldoBs === 0
+      saldoBs === 0 &&
+      montoUsd === 0
     ) {
       continue;
     }
@@ -115,6 +191,9 @@ export function parseProjectedMovements(rows: string[][]): ProjectedMovement[] {
       fecha: parsedFecha,
       fechaRaw,
       concepto,
+      conceptoPL: concepto,
+      descPL: concepto,
+      detallePL: concepto,
       centroCosto: String(row[COL.centroCosto] ?? "").trim(),
       edificio: String(row[COL.edificio] ?? "").trim(),
       status: String(row[COL.status] ?? "").trim(),

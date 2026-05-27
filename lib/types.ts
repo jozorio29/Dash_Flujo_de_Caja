@@ -3,9 +3,9 @@
  *
  * Columnas del Google Sheet usadas (solo las que el usuario considera relevantes):
  *   A=Fecha | B=Hora | C=Mes | D=Oficina | F=Referencia | I=Tipo |
- *   J=Concepto P&L | K=Desc P&L | M=Débitos | N=Créditos |
+ *   J=Concepto P&L | K=Desc P&L | L=Detalle P&L | M=Débitos | N=Créditos |
  *   O=Saldo Bs | S=Saldo USD
- * Las columnas E (Descripción), G (Cód. Trans.), H (ITF), L, P, Q y R
+ * Las columnas E (Descripción), G (Cód. Trans.), H (ITF), P, Q y R
  * NO se usan en el dashboard.
  */
 
@@ -23,6 +23,7 @@ export interface Movement {
   tipo: MovementType;
   conceptoPL: string;
   descPL: string;
+  detallePL: string;
   debitos: number;
   creditos: number;
   /** Saldo running en Bolivianos (post-movimiento). Columna N del sheet. */
@@ -106,15 +107,21 @@ export interface Insight {
 
 // ─── FLUJO DE CAJA PROYECTADO ────────────────────────────────────────────────
 //
-// Columnas de la pestaña "Flujo":
-//   A=Fecha | B=Concepto | C=Centro de Costo | D=Edificio | E=Status |
-//   F=Ingresos (Bs) | G=Egresos (Bs) | H=Stand by (Bs) |
-//   I=Saldo en P. Bol (Bs) | J=Monto en USD
+// Columnas de proyección soportadas:
+//   Formato simple: A=Fecha | B=Concepto | C=Centro de Costo | D=Edificio |
+//   E=Status | F=Ingresos | G=Egresos | H=Stand by | I=Saldo | J=USD
+//
+//   Formato recomendado A:S, igual al consolidado:
+//   A=Fecha | F=Referencia | K=Concepto P&L | L=Desc P&L |
+//   M=Débitos | N=Créditos | Q=Débito USD | R=Crédito USD
 
 export interface ProjectedMovement {
   fecha: Date | null;
   fechaRaw: string;
   concepto: string;
+  conceptoPL: string;
+  descPL: string;
+  detallePL: string;
   centroCosto: string;
   edificio: string;
   status: string;
