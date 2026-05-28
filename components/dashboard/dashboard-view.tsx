@@ -1,41 +1,52 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DashboardData, Movement } from "@/lib/types";
+import { DashboardData, Movement, ProjectedDashboardData, ProjectedMovement } from "@/lib/types";
 import { buildDashboard } from "@/lib/aggregations";
 import { parseApiDate } from "@/lib/utils";
 import { DashboardFilters, DashboardHeader } from "./header";
-import { KpiCards } from "./kpi-cards";
-import { DailyBalanceChart } from "./daily-balance-chart";
+import { KpiCardsV2 } from "./kpi-cards-v2";
 import { MonthlyFlowsChart } from "./monthly-flows-chart";
-import { NetFlowChart } from "./net-flow-chart";
-import { CategoryTable } from "./category-table";
-import { InsightsPanel } from "./insights-panel";
+import { ExpenseDonut } from "./expense-donut";
+import { IngresosEgresosBars } from "./ingresos-egresos-bars";
+import { SaldoTrendArea } from "./saldo-trend-area";
+import { CuentasPorPagar } from "./cuentas-por-pagar";
 import { Loader2, AlertTriangle } from "lucide-react";
 
-/**
- * El JSON serializa Date como string. Necesitamos rehidratar `fecha` a Date
- * para que las agregaciones por mes/día funcionen client-side.
- */
 function rehydrateMovements(raw: any[]): Movement[] {
-  return raw.map((m) => ({
-    ...m,
-    fecha: parseApiDate(m.fecha),
-  }));
+  return raw.map((m) => ({ ...m, fecha: parseApiDate(m.fecha) }));
 }
 
-/**
- * Parsea "yyyy-mm-dd" como medianoche en HORA LOCAL.
- * `new Date("yyyy-mm-dd")` lo interpreta como UTC, lo que rompe los filtros
- * en zonas horarias negativas (ej: en Lima excluye el día seleccionado).
- */
+function rehydrateProjected(raw: any[]): ProjectedMovement[] {
+  return raw.map((m) => ({ ...m, fecha: parseApiDate(m.fecha) }));
+}
+
 function parseLocalDate(s: string): Date {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d, 0, 0, 0, 0);
 }
 
+function rateAt(m: Movement): number {
+  if (!m.saldo || !m.saldoUsd) return 0;
+  return m.saldoUsd / m.saldo;
+}
+
+/**
+ * Computa el período "anterior" del mismo largo, contiguo y precediendo al actual.
+ * Si current = [feb 1, feb 28] (28d), prev = [ene 4, ene 31].
+ */
+function previousPeriod(from: Date, to: Date): { from: Date; to: Date } {
+  const ms = to.getTime() - from.getTime();
+  const prevTo = new Date(from.getTime() - 24 * 60 * 60 * 1000);
+  prevTo.setHours(23, 59, 59, 999);
+  const prevFrom = new Date(prevTo.getTime() - ms);
+  prevFrom.setHours(0, 0, 0, 0);
+  return { from: prevFrom, to: prevTo };
+}
+
 export function DashboardView() {
   const [allMovements, setAllMovements] = useState<Movement[] | null>(null);
+  const [allProjected, setAllProjected] = useState<ProjectedMovement[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,21 +57,34 @@ export function DashboardView() {
   });
   const filtersInitializedRef = useRef(false);
 
-  // Carga única al montar. Para ver datos nuevos del sheet, recargar la página.
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
         setLoading(true);
-        const res = await fetch("/api/dashboard", { cache: "no-store" });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `HTTP ${res.status}`);
+        // Cargar EN PARALELO el dashboard real Y los proyectados (para Cuentas por Pagar)
+        const [resReal, resProy] = await Promise.all([
+          fetch("/api/dashboard", { cache: "no-store" }),
+          fetch("/api/proyectado", { cache: "no-store" }).catch(() => null),
+        ]);
+        if (!resReal.ok) {
+          const body = await resReal.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${resReal.status}`);
         }
-        const json = (await res.json()) as DashboardData;
+        const json = (await resReal.json()) as DashboardData;
         if (cancelled) return;
+
         const movs = rehydrateMovements(json.movements);
         setAllMovements(movs);
+
+        // Proyectado es opcional (si no existe la pestaña Flujo, seguimos sin Cuentas por Pagar)
+        if (resProy && resProy.ok) {
+          const jsonProy = (await resProy.json()) as ProjectedDashboardData;
+          setAllProjected(rehydrateProjected(jsonProy.movements));
+        } else {
+          setAllProjected([]);
+        }
+
         if (!filtersInitializedRef.current) {
           setFilters({
             from: json.meta.fechaInicio ?? "",
@@ -82,7 +106,7 @@ export function DashboardView() {
     };
   }, []);
 
-  // Aplica filtros y reconstruye el dashboard
+  // Filtros aplicados → DashboardData
   const filtered: DashboardData | null = useMemo(() => {
     if (!allMovements) return null;
     let movs = allMovements;
@@ -98,7 +122,74 @@ export function DashboardView() {
     return buildDashboard(movs);
   }, [allMovements, filters]);
 
-  // Min/max de fechas disponibles para el date picker
+  // Movements del período ANTERIOR (mismo largo, antes del actual) para los % vs prev
+  const prevKpis = useMemo(() => {
+    if (!allMovements || !filters.from || !filters.to) return null;
+    const curFrom = parseLocalDate(filters.from);
+    const curTo = parseLocalDate(filters.to);
+    const { from, to } = previousPeriod(curFrom, curTo);
+
+    const prevMovs = allMovements.filter(
+      (m) => m.fecha && m.fecha.getTime() >= from.getTime() && m.fecha.getTime() <= to.getTime()
+    );
+    if (prevMovs.length === 0) return null;
+
+    const isUsd = filters.moneda === "USD";
+    let ingresos = 0;
+    let egresos = 0;
+    for (const m of prevMovs) {
+      if (isUsd) {
+        const r = rateAt(m);
+        ingresos += m.creditos * r;
+        egresos += m.debitos * r;
+      } else {
+        ingresos += m.creditos;
+        egresos += m.debitos;
+      }
+    }
+    const last = prevMovs[prevMovs.length - 1];
+    const saldoAcumulado = isUsd ? last?.saldoUsd ?? 0 : last?.saldo ?? 0;
+
+    return { ingresos, egresos, saldoAcumulado };
+  }, [allMovements, filters]);
+
+  // KPIs v2 (con comparación vs período anterior)
+  const kpisV2 = useMemo(() => {
+    if (!filtered) return null;
+    const k = filtered.kpis;
+    const isUsd = filters.moneda === "USD";
+
+    const ingresosTotales = isUsd ? k.ingresosTotalesUsd : k.ingresosTotales;
+    const egresosTotales = isUsd ? k.egresosTotalesUsd : k.egresosTotales;
+    const saldoAcumulado = isUsd ? k.saldoFinalUsd : k.saldoFinal;
+
+    // Saldo Disponible = Saldo Acumulado - Total pendientes de pago
+    // (movimientos proyectados con egresos > 0, FUTUROS desde hoy)
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const totalPendiente = allProjected
+      .filter((p) => p.fecha && p.fecha.getTime() >= now.getTime() && p.egresos > 0)
+      .reduce((s, p) => s + p.egresos, 0);
+    const saldoDisponible = saldoAcumulado - totalPendiente;
+
+    return {
+      ingresosTotales,
+      egresosTotales,
+      saldoAcumulado,
+      saldoDisponible,
+      prevIngresos: prevKpis?.ingresos ?? null,
+      prevEgresos: prevKpis?.egresos ?? null,
+      prevSaldoAcumulado: prevKpis?.saldoAcumulado ?? null,
+    };
+  }, [filtered, filters.moneda, prevKpis, allProjected]);
+
+  // Cuentas por Pagar = proyectados con egresos > 0 desde HOY hacia adelante
+  const cuentasPorPagar = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return allProjected.filter((p) => p.fecha && p.fecha.getTime() >= now.getTime() && p.egresos > 0);
+  }, [allProjected]);
+
   const { minDate, maxDate } = useMemo(() => {
     if (!allMovements || allMovements.length === 0)
       return { minDate: null, maxDate: null };
@@ -106,15 +197,13 @@ export function DashboardView() {
       .map((m) => m.fecha)
       .filter((d): d is Date => d !== null)
       .sort((a, b) => a.getTime() - b.getTime());
-    const first = dates[0];
-    const last = dates[dates.length - 1];
     const fmt = (d: Date) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
         d.getDate()
       ).padStart(2, "0")}`;
     return {
-      minDate: first ? fmt(first) : null,
-      maxDate: last ? fmt(last) : null,
+      minDate: dates[0] ? fmt(dates[0]) : null,
+      maxDate: dates[dates.length - 1] ? fmt(dates[dates.length - 1]) : null,
     };
   }, [allMovements]);
 
@@ -135,20 +224,17 @@ export function DashboardView() {
           No se pudieron cargar los datos
         </div>
         <pre className="mt-3 whitespace-pre-wrap text-sm">{error}</pre>
-        <p className="mt-3 text-sm">
-          Verifica que <code className="rounded bg-white px-1.5 py-0.5">GOOGLE_SHEETS_API_KEY</code>{" "}
-          y <code className="rounded bg-white px-1.5 py-0.5">GOOGLE_SHEETS_SPREADSHEET_ID</code>{" "}
-          estén configurados en{" "}
-          <code className="rounded bg-white px-1.5 py-0.5">.env.local</code> y que el sheet esté
-          compartido como <em>Cualquiera con el enlace</em>.
-        </p>
       </div>
     );
   }
 
-  if (!filtered) return null;
+  if (!filtered || !kpisV2) return null;
 
   const isEmpty = filtered.movements.length === 0;
+
+  // Saldo inicial del rango (para el área chart de tendencia)
+  const saldoInicial =
+    filters.moneda === "USD" ? filtered.kpis.saldoInicialUsd : filtered.kpis.saldoInicial;
 
   return (
     <div className="space-y-5 p-6 lg:p-8">
@@ -160,28 +246,40 @@ export function DashboardView() {
         filteredCount={filtered.movements.length}
       />
 
+      <p className="-mt-2 max-w-3xl text-sm text-slate-500">
+        Visualiza tus ingresos, egresos y saldo disponible en tiempo real para tomar mejores
+        decisiones financieras.
+      </p>
+
       {isEmpty ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center text-amber-900">
           <p className="font-semibold">Sin movimientos en el período seleccionado</p>
-          <p className="mt-1 text-sm">
-            Ajusta el rango de fechas para ver datos.
-          </p>
+          <p className="mt-1 text-sm">Ajusta el rango de fechas para ver datos.</p>
         </div>
       ) : (
         <>
-          <KpiCards kpis={filtered.kpis} moneda={filters.moneda} />
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-            <DailyBalanceChart data={filtered.dailyBalances} />
-            <MonthlyFlowsChart data={filtered.monthlyFlows} />
-            <NetFlowChart data={filtered.monthlyFlows} />
+          {/* ── ROW 1: 4 KPI cards ── */}
+          <KpiCardsV2 kpis={kpisV2} moneda={filters.moneda} />
+
+          {/* ── ROW 2: Flujo Mensual (2/3) + Donut Gastos (1/3) ── */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <MonthlyFlowsChart data={filtered.monthlyFlows} />
+            </div>
+            <div className="lg:col-span-1">
+              <ExpenseDonut categories={filtered.categories} moneda={filters.moneda} />
+            </div>
           </div>
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-4">
-            <div className="xl:col-span-3">
-              <CategoryTable categories={filtered.categories} />
-            </div>
-            <div className="xl:col-span-1">
-              <InsightsPanel insights={filtered.insights} />
-            </div>
+
+          {/* ── ROW 3: Comparativo + Tendencia + Cuentas por Pagar ── */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            <IngresosEgresosBars data={filtered.monthlyFlows} moneda={filters.moneda} />
+            <SaldoTrendArea
+              monthlyFlows={filtered.monthlyFlows}
+              saldoInicial={saldoInicial}
+              moneda={filters.moneda}
+            />
+            <CuentasPorPagar movements={cuentasPorPagar} moneda={filters.moneda} />
           </div>
         </>
       )}
