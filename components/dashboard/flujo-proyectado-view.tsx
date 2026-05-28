@@ -107,7 +107,7 @@ function buildProjectedMatrix(
       totalFinPorMes[monthIdx] += neto;
       if (projected) proyectadoNetoPorMes[monthIdx] += neto;
     } else if (section === "ingreso") {
-      if (!isRealIncomeCategory(label)) return;
+      if (!projected && !isRealIncomeCategory(label)) return;
       addToGroup(ingByCat, label, detail, monthIdx, creditos);
       totalIngPorMes[monthIdx] += creditos;
       if (projected) proyectadoNetoPorMes[monthIdx] += creditos;
