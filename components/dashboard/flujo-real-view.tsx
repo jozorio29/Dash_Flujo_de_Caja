@@ -12,6 +12,8 @@ import {
   type FlujoRow,
 } from "./flujo-real-table";
 
+const REAL_INCOME_CATEGORY = "ingreso tigo";
+
 function rehydrate(raw: any[]): Movement[] {
   return raw.map((m) => ({ ...m, fecha: parseApiDate(m.fecha) }));
 }
@@ -19,6 +21,14 @@ function rehydrate(raw: any[]): Movement[] {
 function rateAt(m: Movement): number {
   if (!m.saldo || !m.saldoUsd) return 0;
   return m.saldoUsd / m.saldo;
+}
+
+function normalizeCategory(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isRealIncomeCategory(value: string): boolean {
+  return normalizeCategory(value) === REAL_INCOME_CATEGORY;
 }
 
 /**
@@ -109,6 +119,7 @@ function buildYearMatrix(
       addToGroup(finByCat, cat, detail, monthIdx, neto);
       totalFinPorMes[monthIdx] += neto;
     } else if (section === "ingreso") {
+      if (!isRealIncomeCategory(cat)) continue;
       addToGroup(ingByCat, cat, detail, monthIdx, cred);
       totalIngPorMes[monthIdx] += cred;
     } else {
