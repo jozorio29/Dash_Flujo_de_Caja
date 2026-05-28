@@ -7,6 +7,8 @@ import { cn, parseApiDate } from "@/lib/utils";
 import type { Moneda } from "./header";
 import { FlujoRealTable, type FlujoRealData, type FlujoRow } from "./flujo-real-table";
 
+const REAL_INCOME_CATEGORY = "ingreso tigo";
+
 function rehydrateReal(raw: any[]): Movement[] {
   return raw.map((m) => ({ ...m, fecha: parseApiDate(m.fecha) }));
 }
@@ -18,6 +20,14 @@ function rehydrateProjected(raw: any[]): ProjectedMovement[] {
 function rateAt(m: Movement): number {
   if (!m.saldo || !m.saldoUsd) return 0;
   return m.saldoUsd / m.saldo;
+}
+
+function normalizeCategory(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isRealIncomeCategory(value: string): boolean {
+  return normalizeCategory(value) === REAL_INCOME_CATEGORY;
 }
 
 function detectSection(
@@ -97,6 +107,7 @@ function buildProjectedMatrix(
       totalFinPorMes[monthIdx] += neto;
       if (projected) proyectadoNetoPorMes[monthIdx] += neto;
     } else if (section === "ingreso") {
+      if (!isRealIncomeCategory(label)) return;
       addToGroup(ingByCat, label, detail, monthIdx, creditos);
       totalIngPorMes[monthIdx] += creditos;
       if (projected) proyectadoNetoPorMes[monthIdx] += creditos;
@@ -125,8 +136,8 @@ function buildProjectedMatrix(
   for (const m of projectedOfYear) {
     if (!m.fecha) continue;
     const monthIdx = m.fecha.getMonth();
-    const label = m.conceptoPL || m.concepto || m.centroCosto || "Proyección sin concepto";
-    const detail = m.descPL || m.detallePL || label;
+    const label = m.descPL || m.conceptoPL || m.concepto || m.centroCosto || "Proyección sin concepto";
+    const detail = m.detallePL || m.conceptoPL || m.concepto || label;
     const creditos = moneda === "USD" ? m.creditoUsd : m.ingresos;
     const debitos = moneda === "USD" ? m.debitoUsd : m.egresos;
     if (creditos === 0 && debitos === 0) continue;
