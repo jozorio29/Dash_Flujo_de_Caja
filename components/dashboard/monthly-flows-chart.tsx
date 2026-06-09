@@ -95,7 +95,7 @@ export function MonthlyFlowsChart({ data, moneda }: Props) {
               <Line
                 type="monotone"
                 dataKey="netFlow"
-                name="Net Flow"
+                name="FC Neto"
                 stroke="#10B981"
                 strokeWidth={2}
                 dot={{ r: 4, fill: "#10B981" }}
