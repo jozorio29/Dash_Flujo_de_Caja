@@ -67,7 +67,7 @@ export function ExpenseCategoryDetail({
           <Tags className="h-4 w-4 text-slate-400" />
         </div>
         <p className="mt-0.5 text-xs text-slate-500">
-          Principales detalles agrupados por la columna K (Desc P&amp;L)
+          Principales detalles agrupados por concepto
         </p>
       </CardHeader>
       <CardContent>
@@ -75,7 +75,7 @@ export function ExpenseCategoryDetail({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                <th className="pb-3 pr-4 text-left">Detalle (Columna K)</th>
+                <th className="pb-3 pr-4 text-left">Detalle</th>
                 <th className="pb-3 pr-4 text-center">Movimientos</th>
                 <th className="pb-3 pr-4 text-right">Participación</th>
                 <th className="pb-3 text-right">Valor</th>
