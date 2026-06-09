@@ -186,15 +186,6 @@ export function DashboardHeader({
             </div>
             <div className="mt-1 flex items-center gap-2">
               <div className="relative flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => openDatePicker(fromPickerRef)}
-                  className="flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                  aria-label="Seleccionar fecha desde"
-                  title="Seleccionar fecha desde"
-                >
-                  <Calendar className="h-3.5 w-3.5" />
-                </button>
                 <input
                   ref={fromPickerRef}
                   type="date"
@@ -216,6 +207,15 @@ export function DashboardHeader({
                   className="w-[92px] bg-transparent text-sm font-medium tabular-nums text-slate-800 outline-none placeholder:text-slate-300 focus:text-blue-700"
                   aria-label="Fecha desde"
                 />
+                <button
+                  type="button"
+                  onClick={() => openDatePicker(fromPickerRef)}
+                  className="flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  aria-label="Seleccionar fecha desde"
+                  title="Seleccionar fecha desde"
+                >
+                  <Calendar className="h-3.5 w-3.5" />
+                </button>
               </div>
               <span className="text-slate-400">—</span>
               <div className="relative flex items-center gap-1">
