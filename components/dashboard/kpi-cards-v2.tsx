@@ -130,7 +130,7 @@ export function KpiCardsV2({ kpis, moneda }: Props) {
                       c.sub.positive === false && "text-rose-700"
                     )}
                   >
-                    {c.sub.text}
+                    {/* {c.sub.text} */}
                   </span>
                 </div>
               )}
