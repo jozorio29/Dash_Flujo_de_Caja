@@ -34,11 +34,14 @@ export function ExpenseDonut({ categories, moneda }: Props) {
       ? formatCurrency(v, { symbol: "$", decimals: 2 })
       : formatCurrency(v, { symbol: "Bs " });
 
-  const total = categories.reduce((s, c) => s + c.totalEgresos, 0);
+  const total = categories.reduce(
+    (s, c) => s + (isUsd ? c.totalEgresosUsd : c.totalEgresos),
+    0,
+  );
   const data = categories.map((c) => ({
     name: c.categoria,
-    value: c.totalEgresos,
-    pct: total === 0 ? 0 : c.totalEgresos / total,
+    value: isUsd ? c.totalEgresosUsd : c.totalEgresos,
+    pct: total === 0 ? 0 : (isUsd ? c.totalEgresosUsd : c.totalEgresos) / total,
   }));
 
   function CustomTooltip({ active, payload }: TooltipProps) {

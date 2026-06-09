@@ -45,7 +45,7 @@ export function CuentasPorPagar({ movements, moneda, limit = 6 }: Props) {
 
   const total = movements
     .filter((m) => m.egresos > 0)
-    .reduce((s, m) => s + m.egresos, 0);
+    .reduce((s, m) => s + (isUsd ? m.debitoUsd : m.egresos), 0);
 
   return (
     <Card className="h-full">
@@ -91,7 +91,7 @@ export function CuentasPorPagar({ movements, moneda, limit = 6 }: Props) {
                         </div>
                       </td>
                       <td className="py-2 pr-2 text-right tabular-nums font-medium text-slate-800">
-                        {fmt(m.egresos)}
+                        {fmt(isUsd ? m.debitoUsd : m.egresos)}
                       </td>
                       <td
                         className={cn(

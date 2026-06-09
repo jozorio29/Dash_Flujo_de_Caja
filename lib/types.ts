@@ -73,14 +73,20 @@ export interface MonthlyFlow {
   ingresos: number;
   egresos: number;
   netFlow: number;
+  ingresosUsd: number;
+  egresosUsd: number;
+  netFlowUsd: number;
 }
 
 export interface CategorySummary {
   categoria: string;
   totalEgresos: number;
+  totalEgresosUsd: number;
   porcentajeTotal: number;
   promedioMensual: number;
+  promedioMensualUsd: number;
   evolucion: { month: string; value: number }[];
+  evolucionUsd: { month: string; value: number }[];
   variacionVsPromedio: number; // -1 a +inf
 }
 

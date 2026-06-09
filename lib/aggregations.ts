@@ -128,13 +128,21 @@ function buildDailyBalances(movements: Movement[]): DailyBalance[] {
 }
 
 function buildMonthlyFlows(movements: Movement[]): MonthlyFlow[] {
-  const byMonth = new Map<string, { ingresos: number; egresos: number }>();
+  const byMonth = new Map<
+    string,
+    { ingresos: number; egresos: number; ingresosUsd: number; egresosUsd: number }
+  >();
   for (const m of movements) {
     if (!m.fecha) continue;
     const key = monthKey(m.fecha);
-    const cur = byMonth.get(key) ?? { ingresos: 0, egresos: 0 };
+    const cur = byMonth.get(key) ?? { ingresos: 0, egresos: 0, ingresosUsd: 0, egresosUsd: 0 };
+    const r = rateAt(m);
     cur.ingresos += m.creditos;
     cur.egresos += m.debitos;
+    if (r > 0) {
+      cur.ingresosUsd += m.creditos * r;
+      cur.egresosUsd += m.debitos * r;
+    }
     byMonth.set(key, cur);
   }
   return Array.from(byMonth.entries())
@@ -144,6 +152,9 @@ function buildMonthlyFlows(movements: Movement[]): MonthlyFlow[] {
       ingresos: v.ingresos,
       egresos: v.egresos,
       netFlow: v.ingresos - v.egresos,
+      ingresosUsd: v.ingresosUsd,
+      egresosUsd: v.egresosUsd,
+      netFlowUsd: v.ingresosUsd - v.egresosUsd,
     }))
     .sort((a, b) => a.month.localeCompare(b.month));
 }
@@ -158,14 +169,26 @@ function buildCategories(
   const months = monthly.map((m) => m.month);
 
   // Agrupar por categoría
-  const byCat = new Map<string, { total: number; perMonth: Map<string, number> }>();
+  const byCat = new Map<
+    string,
+    { total: number; totalUsd: number; perMonth: Map<string, number>; perMonthUsd: Map<string, number> }
+  >();
   for (const m of egresos) {
     if (!m.fecha) continue;
     const cat = m.categoria || "Otros";
-    const cur = byCat.get(cat) ?? { total: 0, perMonth: new Map() };
+    const cur = byCat.get(cat) ?? {
+      total: 0,
+      totalUsd: 0,
+      perMonth: new Map(),
+      perMonthUsd: new Map(),
+    };
+    const r = rateAt(m);
+    const debitosUsd = r > 0 ? m.debitos * r : 0;
     cur.total += m.debitos;
+    cur.totalUsd += debitosUsd;
     const mk = monthKey(m.fecha);
     cur.perMonth.set(mk, (cur.perMonth.get(mk) ?? 0) + m.debitos);
+    cur.perMonthUsd.set(mk, (cur.perMonthUsd.get(mk) ?? 0) + debitosUsd);
     byCat.set(cat, cur);
   }
 
@@ -176,7 +199,12 @@ function buildCategories(
         month: mk,
         value: v.perMonth.get(mk) ?? 0,
       }));
+      const evolucionUsd = months.map((mk) => ({
+        month: mk,
+        value: v.perMonthUsd.get(mk) ?? 0,
+      }));
       const promedioMensual = v.total / numMeses;
+      const promedioMensualUsd = v.totalUsd / numMeses;
       // Variación: cómo se comparó el último mes vs el promedio
       const ultimo = evolucion[evolucion.length - 1]?.value ?? 0;
       const variacionVsPromedio =
@@ -184,9 +212,12 @@ function buildCategories(
       return {
         categoria,
         totalEgresos: v.total,
+        totalEgresosUsd: v.totalUsd,
         porcentajeTotal: totalEgresos === 0 ? 0 : v.total / totalEgresos,
         promedioMensual,
+        promedioMensualUsd,
         evolucion,
+        evolucionUsd,
         variacionVsPromedio,
       };
     }
@@ -203,11 +234,17 @@ function buildCategories(
   const otros: CategorySummary = {
     categoria: "Otros gastos",
     totalEgresos: rest.reduce((a, b) => a + b.totalEgresos, 0),
+    totalEgresosUsd: rest.reduce((a, b) => a + b.totalEgresosUsd, 0),
     porcentajeTotal: rest.reduce((a, b) => a + b.porcentajeTotal, 0),
     promedioMensual: rest.reduce((a, b) => a + b.promedioMensual, 0),
+    promedioMensualUsd: rest.reduce((a, b) => a + b.promedioMensualUsd, 0),
     evolucion: months.map((mk, i) => ({
       month: mk,
       value: rest.reduce((a, b) => a + (b.evolucion[i]?.value ?? 0), 0),
+    })),
+    evolucionUsd: months.map((mk, i) => ({
+      month: mk,
+      value: rest.reduce((a, b) => a + (b.evolucionUsd[i]?.value ?? 0), 0),
     })),
     variacionVsPromedio:
       rest.reduce((a, b) => a + b.variacionVsPromedio, 0) / Math.max(rest.length, 1),

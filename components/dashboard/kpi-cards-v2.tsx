@@ -72,7 +72,7 @@ export function KpiCardsV2({ kpis, moneda }: Props) {
           : { text: "Sin período comparable" },
     },
     {
-      title: "Saldo Acumulado",
+      title: "Saldo Disponible",
       value: kpis.saldoAcumulado,
       Icon: Wallet,
       valueColor: kpis.saldoAcumulado >= 0 ? "text-blue-700" : "text-rose-600",
@@ -82,14 +82,14 @@ export function KpiCardsV2({ kpis, moneda }: Props) {
           ? { text: `${formatPct(saldoPct)} vs período anterior`, positive: saldoPct >= 0 }
           : { text: "Sin período comparable" },
     },
-    {
-      title: "Saldo Disponible",
-      value: kpis.saldoDisponible,
-      Icon: PiggyBank,
-      valueColor: kpis.saldoDisponible >= 0 ? "text-amber-700" : "text-rose-600",
-      iconBg: "bg-amber-50 text-amber-600",
-      sub: { text: "Disponible en cuentas" },
-    },
+    // {
+    //   title: "Saldo Disponible",
+    //   value: kpis.saldoDisponible,
+    //   Icon: PiggyBank,
+    //   valueColor: kpis.saldoDisponible >= 0 ? "text-amber-700" : "text-rose-600",
+    //   iconBg: "bg-amber-50 text-amber-600",
+    //   sub: { text: "Disponible en cuentas" },
+    // },
   ];
 
   return (

@@ -35,7 +35,7 @@ export function SaldoTrendArea({ monthlyFlows, saldoInicial, moneda }: Props) {
   // Construir saldo acumulado mes a mes
   let cum = saldoInicial;
   const data = monthlyFlows.map((m) => {
-    cum += m.netFlow;
+    cum += isUsd ? m.netFlowUsd : m.netFlow;
     return {
       month: m.month,
       label: monthLabel(m.month),

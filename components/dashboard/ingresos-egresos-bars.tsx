@@ -31,6 +31,12 @@ function compact(v: number, symbol: string) {
 export function IngresosEgresosBars({ data, moneda }: Props) {
   const isUsd = moneda === "USD";
   const symbol = isUsd ? "$" : "Bs ";
+  const chartData = data.map((m) => ({
+    month: m.month,
+    label: m.label,
+    ingresos: isUsd ? m.ingresosUsd : m.ingresos,
+    egresos: isUsd ? m.egresosUsd : m.egresos,
+  }));
 
   return (
     <Card>
@@ -40,7 +46,7 @@ export function IngresosEgresosBars({ data, moneda }: Props) {
       <CardContent>
         <div className="h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+            <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
               <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} />
               <YAxis

@@ -1,5 +1,5 @@
-import { CashFlowView } from "@/components/dashboard/cash-flow-view";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <CashFlowView />;
+  redirect("/flujo-caja-real");
 }

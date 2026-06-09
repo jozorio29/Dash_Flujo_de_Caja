@@ -169,7 +169,7 @@ export function DashboardView() {
     now.setHours(0, 0, 0, 0);
     const totalPendiente = allProjected
       .filter((p) => p.fecha && p.fecha.getTime() >= now.getTime() && p.egresos > 0)
-      .reduce((s, p) => s + p.egresos, 0);
+      .reduce((s, p) => s + (isUsd ? p.debitoUsd : p.egresos), 0);
     const saldoDisponible = saldoAcumulado - totalPendiente;
 
     return {
@@ -264,7 +264,7 @@ export function DashboardView() {
           {/* ── ROW 2: Flujo Mensual (2/3) + Donut Gastos (1/3) ── */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <MonthlyFlowsChart data={filtered.monthlyFlows} />
+              <MonthlyFlowsChart data={filtered.monthlyFlows} moneda={filters.moneda} />
             </div>
             <div className="lg:col-span-1">
               <ExpenseDonut categories={filtered.categories} moneda={filters.moneda} />

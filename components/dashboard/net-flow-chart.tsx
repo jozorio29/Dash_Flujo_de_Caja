@@ -31,7 +31,19 @@ function compact(v: number) {
 export function NetFlowChart({ data }: Props) {
   // Agregamos una barra "Total" al final
   const total = data.reduce((a, b) => a + b.netFlow, 0);
-  const dataWithTotal = [...data, { month: "TOTAL", label: "Total", ingresos: 0, egresos: 0, netFlow: total }];
+  const dataWithTotal = [
+    ...data,
+    {
+      month: "TOTAL",
+      label: "Total",
+      ingresos: 0,
+      egresos: 0,
+      netFlow: total,
+      ingresosUsd: 0,
+      egresosUsd: 0,
+      netFlowUsd: 0,
+    },
+  ];
 
   return (
     <Card>
