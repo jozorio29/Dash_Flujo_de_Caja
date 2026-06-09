@@ -31,7 +31,7 @@ export function ExpenseCategoryDetail({
   category,
   movements,
   moneda,
-  limit = 6,
+  limit = 5,
 }: Props) {
   const isUsd = moneda === "USD";
   const fmt = (value: number) =>
@@ -55,7 +55,11 @@ export function ExpenseCategoryDetail({
 
   const items = movements
     .filter((movement) => movement.debitos > 0 && movement.categoria === category.categoria)
-    .sort((a, b) => (b.fechaHoraMs || 0) - (a.fechaHoraMs || 0));
+    .sort((a, b) => {
+      const amountA = isUsd ? a.debitos * rateAt(a) : a.debitos;
+      const amountB = isUsd ? b.debitos * rateAt(b) : b.debitos;
+      return amountB - amountA;
+    });
 
   const displayedItems = items.slice(0, limit);
   const total = isUsd ? category.totalEgresosUsd : category.totalEgresos;
@@ -122,7 +126,7 @@ export function ExpenseCategoryDetail({
           </table>
           {items.length > limit && (
             <p className="mt-2 text-right text-[10px] text-slate-400">
-              Mostrando los {limit} movimientos más recientes
+              Mostrando los {limit} gastos más elevados
             </p>
           )}
         </div>
