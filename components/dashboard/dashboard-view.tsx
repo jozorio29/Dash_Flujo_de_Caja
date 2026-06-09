@@ -162,6 +162,7 @@ export function DashboardView() {
 
     const ingresosTotales = isUsd ? k.ingresosTotalesUsd : k.ingresosTotales;
     const egresosTotales = isUsd ? k.egresosTotalesUsd : k.egresosTotales;
+    const saldoInicial = isUsd ? k.saldoInicialUsd : k.saldoInicial;
     const saldoAcumulado = isUsd ? k.saldoFinalUsd : k.saldoFinal;
 
     // Saldo Disponible = Saldo Acumulado - Total pendientes de pago
@@ -174,6 +175,7 @@ export function DashboardView() {
     const saldoDisponible = saldoAcumulado - totalPendiente;
 
     return {
+      saldoInicial,
       ingresosTotales,
       egresosTotales,
       saldoAcumulado,

@@ -6,6 +6,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import type { Moneda } from "./header";
 
 interface KpiV2 {
+  saldoInicial: number;
   ingresosTotales: number;
   egresosTotales: number;
   saldoAcumulado: number;
@@ -49,6 +50,14 @@ export function KpiCardsV2({ kpis, moneda }: Props) {
     iconBg: string;
     sub: { text: string; positive?: boolean } | null;
   }> = [
+    {
+      title: "Saldo Inicial",
+      value: kpis.saldoInicial,
+      Icon: PiggyBank,
+      valueColor: kpis.saldoInicial >= 0 ? "text-slate-800" : "text-rose-600",
+      iconBg: "bg-slate-100 text-slate-600",
+      sub: { text: "Saldo + débito - crédito inicial" },
+    },
     {
       title: "Ingresos Totales",
       value: kpis.ingresosTotales,
