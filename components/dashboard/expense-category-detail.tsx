@@ -10,16 +10,6 @@ interface Props {
   category: CategorySummary | null;
   movements: Movement[];
   moneda: Moneda;
-  limit?: number;
-}
-
-function formatDate(date: Date | null): string {
-  if (!date) return "-";
-  return date.toLocaleDateString("es-PY", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
 }
 
 function rateAt(movement: Movement): number {
@@ -31,7 +21,6 @@ export function ExpenseCategoryDetail({
   category,
   movements,
   moneda,
-  limit = 5,
 }: Props) {
   const isUsd = moneda === "USD";
   const fmt = (value: number) =>
@@ -53,16 +42,22 @@ export function ExpenseCategoryDetail({
     );
   }
 
-  const items = movements
-    .filter((movement) => movement.debitos > 0 && movement.categoria === category.categoria)
-    .sort((a, b) => {
-      const amountA = isUsd ? a.debitos * rateAt(a) : a.debitos;
-      const amountB = isUsd ? b.debitos * rateAt(b) : b.debitos;
-      return amountB - amountA;
-    });
-
-  const displayedItems = items.slice(0, limit);
+  const categoryMovements = movements.filter(
+    (movement) => movement.debitos > 0 && movement.categoria === category.categoria,
+  );
   const total = isUsd ? category.totalEgresosUsd : category.totalEgresos;
+  const grouped = new Map<string, { label: string; value: number; count: number }>();
+
+  for (const movement of categoryMovements) {
+    const label = movement.descPL.trim() || "Sin detalle";
+    const key = label.toLocaleLowerCase("es");
+    const current = grouped.get(key) ?? { label, value: 0, count: 0 };
+    current.value += isUsd ? movement.debitos * rateAt(movement) : movement.debitos;
+    current.count += 1;
+    grouped.set(key, current);
+  }
+
+  const details = Array.from(grouped.values()).sort((a, b) => b.value - a.value);
 
   return (
     <Card className="h-full">
@@ -71,64 +66,51 @@ export function ExpenseCategoryDetail({
           <CardTitle>{category.categoria}</CardTitle>
           <Tags className="h-4 w-4 text-slate-400" />
         </div>
-        <p className="mt-0.5 text-xs text-slate-500">Detalle de gastos de la categoría seleccionada</p>
+        <p className="mt-0.5 text-xs text-slate-500">
+          Principales detalles agrupados por la columna K (Desc P&amp;L)
+        </p>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                <th className="pb-2 pr-2 text-left">Concepto</th>
-                <th className="pb-2 pr-2 text-right">Valor</th>
-                <th className="pb-2 text-right">Fecha</th>
+              <tr className="border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <th className="pb-3 pr-4 text-left">Detalle (Columna K)</th>
+                <th className="pb-3 pr-4 text-center">Movimientos</th>
+                <th className="pb-3 pr-4 text-right">Participación</th>
+                <th className="pb-3 text-right">Valor</th>
               </tr>
             </thead>
             <tbody>
-              {displayedItems.map((movement, index) => {
-                const value = isUsd
-                  ? movement.debitos * rateAt(movement)
-                  : movement.debitos;
-                const label =
-                  movement.detallePL ||
-                  movement.descPL ||
-                  movement.referencia ||
-                  category.categoria;
-
-                return (
-                  <tr
-                    key={`${movement.fechaHoraMs}-${index}`}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
-                  >
-                    <td className="py-2 pr-2 text-slate-700">
-                      <div className="max-w-[140px] truncate" title={label}>
-                        {label}
-                      </div>
-                    </td>
-                    <td className="py-2 pr-2 text-right tabular-nums font-medium text-slate-800">
-                      {fmt(value)}
-                    </td>
-                    <td className="py-2 text-right tabular-nums text-slate-600">
-                      {formatDate(movement.fecha)}
-                    </td>
-                  </tr>
-                );
-              })}
+              {details.map((detail) => (
+                <tr
+                  key={detail.label}
+                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
+                >
+                  <td className="py-3 pr-4 font-medium text-slate-700">{detail.label}</td>
+                  <td className="py-3 pr-4 text-center tabular-nums text-slate-600">
+                    {detail.count}
+                  </td>
+                  <td className="py-3 pr-4 text-right tabular-nums text-slate-600">
+                    {total === 0 ? "0.0%" : `${((detail.value / total) * 100).toFixed(1)}%`}
+                  </td>
+                  <td className="py-3 text-right tabular-nums font-semibold text-slate-800">
+                    {fmt(detail.value)}
+                  </td>
+                </tr>
+              ))}
               <tr className="border-t-2 border-slate-300 bg-slate-50/60 font-semibold">
-                <td className="py-2 pr-2 text-slate-700">Total</td>
-                <td className="py-2 pr-2 text-right tabular-nums text-slate-900">
-                  {fmt(total)}
+                <td className="py-3 pr-4 text-slate-700">Total</td>
+                <td className="py-3 pr-4 text-center tabular-nums text-slate-600">
+                  {categoryMovements.length}
                 </td>
-                <td className="py-2 text-right text-[10px] text-slate-500">
-                  {items.length} gastos
+                <td className="py-3 pr-4 text-right tabular-nums text-slate-600">100.0%</td>
+                <td className="py-3 text-right tabular-nums text-slate-900">
+                  {fmt(total)}
                 </td>
               </tr>
             </tbody>
           </table>
-          {items.length > limit && (
-            <p className="mt-2 text-right text-[10px] text-slate-400">
-              Mostrando los {limit} gastos más elevados
-            </p>
-          )}
         </div>
       </CardContent>
     </Card>

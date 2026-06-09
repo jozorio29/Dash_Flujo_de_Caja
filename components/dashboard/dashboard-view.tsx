@@ -274,20 +274,22 @@ export function DashboardView() {
             </div>
           </div>
 
-          {/* ── ROW 3: Comparativo + Tendencia + Detalle de categoría ── */}
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          {/* ── ROW 3: Comparativo + Tendencia ── */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <IngresosEgresosBars data={filtered.monthlyFlows} moneda={filters.moneda} />
             <SaldoTrendArea
               monthlyFlows={filtered.monthlyFlows}
               saldoInicial={saldoInicial}
               moneda={filters.moneda}
             />
-            <ExpenseCategoryDetail
-              category={selectedCategory}
-              movements={filtered.movements}
-              moneda={filters.moneda}
-            />
           </div>
+
+          {/* ── ROW 4: Detalle amplio de la categoría seleccionada ── */}
+          <ExpenseCategoryDetail
+            category={selectedCategory}
+            movements={filtered.movements}
+            moneda={filters.moneda}
+          />
         </>
       )}
     </div>
