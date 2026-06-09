@@ -10,7 +10,7 @@ import { MonthlyFlowsChart } from "./monthly-flows-chart";
 import { ExpenseDonut } from "./expense-donut";
 import { IngresosEgresosBars } from "./ingresos-egresos-bars";
 import { SaldoTrendArea } from "./saldo-trend-area";
-import { CuentasPorPagar } from "./cuentas-por-pagar";
+import { ExpenseCategoryDetail } from "./expense-category-detail";
 import { Loader2, AlertTriangle } from "lucide-react";
 
 function rehydrateMovements(raw: any[]): Movement[] {
@@ -55,6 +55,7 @@ export function DashboardView() {
     to: "",
     moneda: "BOB",
   });
+  const [selectedExpenseCategory, setSelectedExpenseCategory] = useState<string | null>(null);
   const filtersInitializedRef = useRef(false);
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export function DashboardView() {
     async function load() {
       try {
         setLoading(true);
-        // Cargar EN PARALELO el dashboard real Y los proyectados (para Cuentas por Pagar)
+        // Cargar en paralelo el dashboard real y los proyectados para el saldo disponible.
         const [resReal, resProy] = await Promise.all([
           fetch("/api/dashboard", { cache: "no-store" }),
           fetch("/api/proyectado", { cache: "no-store" }).catch(() => null),
@@ -183,13 +184,6 @@ export function DashboardView() {
     };
   }, [filtered, filters.moneda, prevKpis, allProjected]);
 
-  // Cuentas por Pagar = proyectados con egresos > 0 desde HOY hacia adelante
-  const cuentasPorPagar = useMemo(() => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    return allProjected.filter((p) => p.fecha && p.fecha.getTime() >= now.getTime() && p.egresos > 0);
-  }, [allProjected]);
-
   const { minDate, maxDate } = useMemo(() => {
     if (!allMovements || allMovements.length === 0)
       return { minDate: null, maxDate: null };
@@ -231,6 +225,8 @@ export function DashboardView() {
   if (!filtered || !kpisV2) return null;
 
   const isEmpty = filtered.movements.length === 0;
+  const selectedCategory =
+    filtered.categories.find((category) => category.categoria === selectedExpenseCategory) ?? null;
 
   // Saldo inicial del rango (para el área chart de tendencia)
   const saldoInicial =
@@ -267,11 +263,16 @@ export function DashboardView() {
               <MonthlyFlowsChart data={filtered.monthlyFlows} moneda={filters.moneda} />
             </div>
             <div className="lg:col-span-1">
-              <ExpenseDonut categories={filtered.categories} moneda={filters.moneda} />
+              <ExpenseDonut
+                categories={filtered.categories}
+                moneda={filters.moneda}
+                selectedCategory={selectedCategory?.categoria ?? null}
+                onSelectCategory={setSelectedExpenseCategory}
+              />
             </div>
           </div>
 
-          {/* ── ROW 3: Comparativo + Tendencia + Cuentas por Pagar ── */}
+          {/* ── ROW 3: Comparativo + Tendencia + Detalle de categoría ── */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <IngresosEgresosBars data={filtered.monthlyFlows} moneda={filters.moneda} />
             <SaldoTrendArea
@@ -279,7 +280,11 @@ export function DashboardView() {
               saldoInicial={saldoInicial}
               moneda={filters.moneda}
             />
-            <CuentasPorPagar movements={cuentasPorPagar} moneda={filters.moneda} />
+            <ExpenseCategoryDetail
+              category={selectedCategory}
+              movements={filtered.movements}
+              moneda={filters.moneda}
+            />
           </div>
         </>
       )}

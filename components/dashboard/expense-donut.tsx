@@ -9,6 +9,8 @@ import type { Moneda } from "./header";
 interface Props {
   categories: CategorySummary[];
   moneda: Moneda;
+  selectedCategory: string | null;
+  onSelectCategory: (category: string) => void;
 }
 
 const COLORS = [
@@ -27,7 +29,12 @@ interface TooltipProps {
   payload?: Array<{ name: string; value: number; payload: any }>;
 }
 
-export function ExpenseDonut({ categories, moneda }: Props) {
+export function ExpenseDonut({
+  categories,
+  moneda,
+  selectedCategory,
+  onSelectCategory,
+}: Props) {
   const isUsd = moneda === "USD";
   const fmt = (v: number) =>
     isUsd
@@ -92,9 +99,20 @@ export function ExpenseDonut({ categories, moneda }: Props) {
                   paddingAngle={2}
                   dataKey="value"
                 >
-                  {data.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
+                  {data.map((d, i) => {
+                    const selected = d.name === selectedCategory;
+                    return (
+                      <Cell
+                        key={d.name}
+                        fill={COLORS[i % COLORS.length]}
+                        cursor="pointer"
+                        opacity={selectedCategory && !selected ? 0.35 : 1}
+                        stroke={selected ? "#0f172a" : "#ffffff"}
+                        strokeWidth={selected ? 3 : 1}
+                        onClick={() => onSelectCategory(d.name)}
+                      />
+                    );
+                  })}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
               </PieChart>
@@ -113,7 +131,17 @@ export function ExpenseDonut({ categories, moneda }: Props) {
           {/* Leyenda */}
           <div className="w-full space-y-1.5">
             {data.map((d, i) => (
-              <div key={d.name} className="flex items-center justify-between gap-2 text-xs">
+              <button
+                key={d.name}
+                type="button"
+                onClick={() => onSelectCategory(d.name)}
+                className={cn(
+                  "flex w-full items-center justify-between gap-2 rounded-md px-1.5 py-1 text-left text-xs transition-colors",
+                  selectedCategory === d.name
+                    ? "bg-slate-100 ring-1 ring-slate-200"
+                    : "hover:bg-slate-50",
+                )}
+              >
                 <div className="flex min-w-0 items-center gap-2">
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-sm"
@@ -126,7 +154,7 @@ export function ExpenseDonut({ categories, moneda }: Props) {
                 <span className={cn("shrink-0 tabular-nums font-semibold text-slate-800")}>
                   {(d.pct * 100).toFixed(1)}%
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
