@@ -159,16 +159,20 @@ function buildYearMatrix(
     (_, i) => totalIngPorMes[i] - totalEgrPorMes[i],
   );
 
-  // Saldos del extracto por mes: la fuente de verdad es la columna de saldo,
-  // no un recálculo desde ingresos/egresos.
+  // El saldo del extracto es post-movimiento. Para obtener el saldo inicial
+  // del mes, revertimos el primer movimiento: saldo + débito - crédito.
   const saldoInicialPorMes = empty12();
   const saldoFinalPorMes = empty12();
+  const mesConSaldoInicial = new Array(12).fill(false);
   for (const m of ofYear) {
     if (!m.fecha) continue;
     const monthIdx = m.fecha.getMonth();
     const saldo = moneda === "USD" ? m.saldoUsd : m.saldo;
-    if (saldoInicialPorMes[monthIdx] === 0) {
-      saldoInicialPorMes[monthIdx] = saldo;
+    if (!mesConSaldoInicial[monthIdx]) {
+      const factor = moneda === "USD" ? rateAt(m) : 1;
+      saldoInicialPorMes[monthIdx] =
+        saldo + m.debitos * factor - m.creditos * factor;
+      mesConSaldoInicial[monthIdx] = true;
     }
     saldoFinalPorMes[monthIdx] = saldo;
   }
