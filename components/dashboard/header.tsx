@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Calendar, RotateCcw, Coins } from "lucide-react";
+import { Calendar, RotateCcw, Coins, ExternalLink, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type Moneda = "BOB" | "USD";
@@ -179,6 +179,19 @@ export function DashboardHeader({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <a
+            href="/planilla"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-[66px] items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-100"
+            aria-label="Abrir la planilla de Google Sheets en una pestaña nueva"
+            title="Abrir base de datos"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            <span>Base de datos</span>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+
           {/* Período */}
           <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
