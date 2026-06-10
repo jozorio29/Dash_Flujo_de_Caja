@@ -319,7 +319,7 @@ export function FlujoProyectadoView() {
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="flex items-center gap-1.5">
               <Calendar className="h-3 w-3 text-slate-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
@@ -339,7 +339,7 @@ export function FlujoProyectadoView() {
             </select>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="flex items-center gap-1.5">
               <Coins className="h-3 w-3 text-slate-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
