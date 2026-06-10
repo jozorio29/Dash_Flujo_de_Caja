@@ -183,17 +183,17 @@ export function DashboardHeader({
             href="/planilla"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-[66px] items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-100"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-100"
             aria-label="Abrir la planilla de Google Sheets en una pestaña nueva"
             title="Abrir base de datos"
           >
-            <FileSpreadsheet className="h-4 w-4" />
+            <FileSpreadsheet className="h-3.5 w-3.5" />
             <span>Base de datos</span>
-            <ExternalLink className="h-3.5 w-3.5" />
+            <ExternalLink className="h-3 w-3" />
           </a>
 
           {/* Período */}
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
               Período del análisis
             </div>
@@ -270,7 +270,7 @@ export function DashboardHeader({
           </div>
 
           {/* Moneda — toggle BOB / USD */}
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="flex items-center gap-1.5">
               <Coins className="h-3 w-3 text-slate-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
