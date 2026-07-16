@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-// import { signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   TrendingUp,
@@ -35,7 +35,7 @@ const NAV = [
 
 export function Sidebar({ onHide }: { onHide: () => void }) {
   const pathname = usePathname();
-  // const { data: session } = useSession();
+  const { data: session } = useSession();
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-800/40 bg-[#0B1B3B] text-slate-200 md:flex">
@@ -95,7 +95,7 @@ export function Sidebar({ onHide }: { onHide: () => void }) {
         })}
       </nav>
 
-      {/* <div className="m-3 rounded-xl bg-slate-900/40 p-3 text-xs ring-1 ring-white/5">
+      <div className="m-3 rounded-xl bg-slate-900/40 p-3 text-xs ring-1 ring-white/5">
         {session?.user && (
           <>
             <div className="mb-2 flex items-center gap-2 text-slate-400">
@@ -114,7 +114,7 @@ export function Sidebar({ onHide }: { onHide: () => void }) {
           <LogOut className="h-3.5 w-3.5" />
           Cerrar sesión
         </button>
-      </div> */}
+      </div>
     </aside>
   );
 }

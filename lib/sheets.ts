@@ -1,36 +1,18 @@
 import { Movement, MovementType } from "./types";
 import { parseAmount, parseDate } from "./utils";
-
-interface SheetsResponse {
-  range: string;
-  majorDimension: string;
-  values: string[][];
-}
+import { fetchSheetValues } from "./google-sheets-client";
 
 /**
- * Lee el rango configurado del Google Sheet vía REST + API key.
- * No requiere OAuth porque el sheet debe estar compartido como público (lectura).
+ * Lee el rango configurado del Google Sheet.
+ * Para hojas restringidas usa la cuenta de servicio configurada en el servidor.
  */
 export async function fetchSheetRows(): Promise<string[][]> {
-  const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   const range = process.env.GOOGLE_SHEETS_RANGE || "Hoja 1!A:S";
 
-  if (!apiKey) throw new Error("GOOGLE_SHEETS_API_KEY no configurada en .env.local");
   if (!spreadsheetId) throw new Error("GOOGLE_SHEETS_SPREADSHEET_ID no configurada en .env.local");
 
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(
-    range
-  )}?key=${apiKey}&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`;
-
-  // Sin cache: cada request lee el sheet fresco para soportar el modo "tiempo real".
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Google Sheets API error ${res.status}: ${body}`);
-  }
-  const data: SheetsResponse = await res.json();
-  return data.values || [];
+  return fetchSheetValues(spreadsheetId, range);
 }
 
 /**

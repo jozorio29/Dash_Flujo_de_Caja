@@ -1,58 +1,239 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { AlertTriangle } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { AlertTriangle, Eye, EyeOff, Loader2 } from "lucide-react";
 
 function LoginContent() {
   const params = useSearchParams();
-  const error = params.get("error");
+  const router = useRouter();
   const callbackUrl = params.get("callbackUrl") || "/";
+  const urlError = params.get("error");
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const errorMessage =
-    error === "AccessDenied"
+    formError ??
+    (urlError === "AccessDenied"
       ? "Tu email no está autorizado para acceder a este dashboard."
-      : error
+      : urlError === "CredentialsSignin"
+      ? "Email o contraseña incorrectos."
+      : urlError
       ? "Ocurrió un error al iniciar sesión. Intenta de nuevo."
-      : null;
+      : null);
+
+  async function handleCredentials(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    setLoading(true);
+    const res = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+    setLoading(false);
+    if (res?.error) {
+      setFormError("Email o contraseña incorrectos.");
+      return;
+    }
+    router.push(callbackUrl);
+    router.refresh();
+  }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl ring-1 ring-slate-200">
-        <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-[#f2f2f2] shadow-lg shadow-blue-200">
-            <img src="/xtendo-logo.svg" alt="Xtendo" className="h-full w-full object-contain" />
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
+      <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 lg:grid-cols-2">
+        {/* ── Panel izquierdo: formulario ─────────────────────────── */}
+        <div className="flex flex-col justify-center px-8 py-10 sm:px-12">
+          <div className="mb-8 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-[#f2f2f2] shadow-md">
+              <img
+                src="/xtendo-logo.svg"
+                alt="Xtendo"
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <div className="leading-tight">
+              <div className="text-sm font-semibold text-slate-900">Xtendo</div>
+              <div className="text-[11px] uppercase tracking-wider text-slate-400">
+                Flujo de Caja
+              </div>
+            </div>
           </div>
+
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Flujo de Caja
+            Inicia sesión 
           </h1>
-          <p className="mt-1 text-sm font-semibold uppercase tracking-wider text-blue-700">
-            Xtendo
+          <p className="mt-1 text-sm text-slate-500">
+            Usa tu cuenta de Google de la empresa o tus credenciales.
           </p>
-          <p className="mt-3 text-sm text-slate-600">
-            Inicia sesión con tu cuenta de Google autorizada para acceder al dashboard.
+
+          {errorMessage && (
+            <div className="mt-5 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>{errorMessage}</p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => signIn("google", { callbackUrl })}
+            className="mt-6 flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+          >
+            <GoogleIcon />
+            Continuar con Google
+          </button>
+
+          <div className="my-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-slate-200" />
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+              o
+            </span>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+
+          <form onSubmit={handleCredentials} className="space-y-4">
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+              >
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@email.com"
+                className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="password"
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+              >
+                Contraseña
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Tu contraseña"
+                  className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 pr-10 text-sm text-slate-900 placeholder-slate-400 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600"
+                  aria-label={
+                    showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+                  }
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              ¿Olvidaste tu contraseña? Contacta al administrador.
+            </p>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              Iniciar sesión
+            </button>
+          </form>
+
+          <p className="mt-8 text-center text-xs text-slate-400">
+            Acceso restringido. Solo usuarios autorizados pueden ver los datos.
           </p>
         </div>
 
-        {errorMessage && (
-          <div className="mb-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>{errorMessage}</p>
+        {/* ── Panel derecho: preview ──────────────────────────────── */}
+        <div className="relative hidden flex-col justify-center overflow-hidden bg-gradient-to-br from-[#0B1B3B] via-blue-900 to-blue-700 p-10 lg:flex">
+          <div className="relative z-10">
+            <p className="text-lg font-medium leading-snug text-blue-100">
+              Gestiona el flujo de caja de tu empresa{" "}
+              <span className="font-semibold text-white">
+                con datos en tiempo real
+              </span>
+            </p>
+
+            {/* Mock del dashboard */}
+            <div className="mt-8 rounded-2xl bg-white/95 p-4 shadow-2xl ring-1 ring-white/20">
+              <div className="flex gap-3">
+                {/* mini sidebar */}
+                <div className="hidden w-20 shrink-0 flex-col gap-2 rounded-lg bg-[#0B1B3B] p-2 xl:flex">
+                  <div className="h-2 w-10 rounded bg-white/40" />
+                  <div className="mt-2 h-1.5 w-full rounded bg-blue-400/60" />
+                  <div className="h-1.5 w-full rounded bg-white/15" />
+                  <div className="h-1.5 w-full rounded bg-white/15" />
+                  <div className="h-1.5 w-full rounded bg-white/15" />
+                </div>
+                {/* contenido */}
+                <div className="min-w-0 flex-1">
+                  <div className="mb-3 h-2 w-24 rounded bg-slate-300" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-lg bg-emerald-50 p-2 ring-1 ring-emerald-100">
+                      <div className="h-1.5 w-8 rounded bg-emerald-300" />
+                      <div className="mt-1.5 h-2.5 w-12 rounded bg-emerald-500" />
+                    </div>
+                    <div className="rounded-lg bg-rose-50 p-2 ring-1 ring-rose-100">
+                      <div className="h-1.5 w-8 rounded bg-rose-300" />
+                      <div className="mt-1.5 h-2.5 w-12 rounded bg-rose-400" />
+                    </div>
+                    <div className="rounded-lg bg-blue-50 p-2 ring-1 ring-blue-100">
+                      <div className="h-1.5 w-8 rounded bg-blue-300" />
+                      <div className="mt-1.5 h-2.5 w-12 rounded bg-blue-500" />
+                    </div>
+                  </div>
+                  {/* barras */}
+                  <div className="mt-3 flex h-20 items-end gap-1.5 rounded-lg bg-slate-50 p-2 ring-1 ring-slate-100">
+                    {[35, 55, 40, 70, 50, 85, 60, 75, 45, 90, 65, 80].map(
+                      (h, i) => (
+                        <div
+                          key={i}
+                          style={{ height: `${h}%` }}
+                          className={
+                            i % 3 === 1
+                              ? "flex-1 rounded-t bg-blue-300"
+                              : "flex-1 rounded-t bg-blue-600"
+                          }
+                        />
+                      )
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
 
-        <button
-          onClick={() => signIn("google", { callbackUrl })}
-          className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-        >
-          <GoogleIcon />
-          Continuar con Google
-        </button>
-
-        <p className="mt-6 text-center text-xs text-slate-500">
-          Acceso restringido. Solo emails autorizados pueden ver los datos.
-        </p>
+          {/* decoración */}
+          <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
+          <div className="absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+        </div>
       </div>
     </div>
   );

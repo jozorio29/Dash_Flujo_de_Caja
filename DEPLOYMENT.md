@@ -9,7 +9,7 @@ Tu compu → GitHub (privado) → Vercel (auto-deploy)
                                   ↓
                  https://tu-app.vercel.app  ←  login Google (solo emails de la allowlist)
                                   ↓
-                          Google Sheets API
+                 Google Sheets API + cuenta de servicio
 ```
 
 ---
@@ -76,7 +76,8 @@ Esto crea las credenciales que permiten el "Login con Google".
 
    | Name | Value |
    |---|---|
-   | `GOOGLE_SHEETS_API_KEY` | (tu API key del Sheets) |
+   | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | (el `client_email` de la clave JSON) |
+   | `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | (el `private_key` completo de la clave JSON) |
    | `GOOGLE_SHEETS_SPREADSHEET_ID` | `1rXG5UJVRwwpVqbzYIkwfpQS9LMZjGTPdu6HLm72K1Yk` |
    | `GOOGLE_SHEETS_RANGE` | `Consolidado Enero a Marzo!A:N` |
    | `GOOGLE_CLIENT_ID` | (del paso 2) |
@@ -85,6 +86,10 @@ Esto crea las credenciales que permiten el "Login con Google".
    | `ALLOWED_EMAILS` | `tu_email@gmail.com,otra_persona@gmail.com` |
 
    > **No agregues** `NEXTAUTH_URL` — Vercel la setea automáticamente.
+
+   Antes de desplegar, abre la planilla → **Compartir** y agrega el valor de
+   `GOOGLE_SERVICE_ACCOUNT_EMAIL` con permiso **Lector**. La planilla puede
+   permanecer con el acceso general en **Restringido**.
 
 6. **Deploy**. Vercel compila e instala (≈2 minutos). Cuando termine, te da una URL tipo `https://dash-flujo-caja-xtendo.vercel.app`.
 

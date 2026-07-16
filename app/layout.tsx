@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-// import { AuthSessionProvider } from "@/components/auth/session-provider";
+import { AuthSessionProvider } from "@/components/auth/session-provider";
 import { AppShell } from "@/components/layout/app-shell";
 
 const inter = Inter({
@@ -23,9 +23,9 @@ export default function RootLayout({
   return (
     <html lang="es" className={inter.variable}>
       <body className="font-sans">
-        {/* <AuthSessionProvider>
-          </AuthSessionProvider> */}
-        <AppShell>{children}</AppShell>
+        <AuthSessionProvider>
+          <AppShell>{children}</AppShell>
+        </AuthSessionProvider>
       </body>
     </html>
   );

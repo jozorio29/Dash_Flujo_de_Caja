@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { getMovements } from "@/lib/sheets";
 import { buildDashboard } from "@/lib/aggregations";
 
@@ -10,6 +12,10 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
   try {
     const movements = await getMovements();
     const data = buildDashboard(movements);
@@ -18,7 +24,11 @@ export async function GET() {
     const message = err instanceof Error ? err.message : "Error desconocido";
     console.error("[/api/dashboard]", err);
     return NextResponse.json(
-      { error: message, hint: "Revisa GOOGLE_SHEETS_API_KEY y que el sheet esté compartido públicamente." },
+      {
+        error: message,
+        hint:
+          "Para una hoja restringida, comparte la planilla como Lector con GOOGLE_SERVICE_ACCOUNT_EMAIL.",
+      },
       { status: 500 }
     );
   }
