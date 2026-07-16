@@ -13,6 +13,11 @@ export const metadata: Metadata = {
   title: "Flujo de Caja | Xtendo",
   description:
     "Dashboard de análisis financiero - Ingresos, egresos y flujo de caja",
+  icons: {
+    icon: "/xtendo-favicon.png",
+    shortcut: "/xtendo-favicon.png",
+    apple: "/xtendo-favicon.png",
+  },
 };
 
 export default function RootLayout({
