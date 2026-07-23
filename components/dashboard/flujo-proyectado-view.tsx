@@ -136,8 +136,8 @@ function buildProjectedMatrix(
   for (const m of projectedOfYear) {
     if (!m.fecha) continue;
     const monthIdx = m.fecha.getMonth();
-    const label = m.descPL || m.conceptoPL || m.concepto || m.centroCosto || "Proyección sin concepto";
-    const detail = m.detallePL || m.conceptoPL || m.concepto || label;
+    const label = m.conceptoPL || m.descPL || m.concepto || m.centroCosto || "Proyección sin concepto";
+    const detail = m.descPL || m.detallePL || m.concepto || label;
     const creditos = moneda === "USD" ? m.creditoUsd : m.ingresos;
     const debitos = moneda === "USD" ? m.debitoUsd : m.egresos;
     if (creditos === 0 && debitos === 0) continue;
