@@ -1,0 +1,306 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, AlertTriangle, Coins, Calendar, Filter } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { cn } from "@/lib/utils";
+
+interface FacturacionRow {
+  ano: number;
+  mes: string;
+  tigoBolivia: number;
+  tigoUruguayCC: number;
+  tigoUruguayTM: number;
+  tigoUruguayCapCC: number;
+  tigoUruguayCapTV: number;
+  tigoUruguayCapPort: number;
+  tigoOtros: number;
+  alquilerPos: number;
+  alquilerSala: number;
+  alquilerZen: number;
+  tc: number;
+  fecha: string; // From API it's string
+}
+
+type Moneda = "USD" | "BOB";
+
+const COLUMNS = [
+  { key: "tigoBolivia", label: "TIGO Bolivia (e-care)", color: "#2563eb" }, // blue-600
+  { key: "tigoUruguayCC", label: "TIGO Uruguay (Call center)", color: "#16a34a" }, // green-600
+  { key: "tigoUruguayTM", label: "TIGO Uruguay (telemarketing)", color: "#dc2626" }, // red-600
+  { key: "tigoUruguayCapCC", label: "TIGO Uruguay Call center Cap", color: "#d97706" }, // amber-600
+  { key: "tigoUruguayCapTV", label: "TIGO Uruguay Televentas Cap", color: "#9333ea" }, // purple-600
+  { key: "tigoUruguayCapPort", label: "TIGO Uruguay Portabilidad Cap", color: "#0891b2" }, // cyan-600
+  { key: "tigoOtros", label: "TIGO Otros servicios", color: "#4f46e5" }, // indigo-600
+  { key: "alquilerPos", label: "Alquiler Tupperware pos. trabajo", color: "#db2777" }, // pink-600
+  { key: "alquilerSala", label: "Alquiler Tupperware sala cap.", color: "#ea580c" }, // orange-600
+  { key: "alquilerZen", label: "Alquiler Torre Zen Piso 2 pos.", color: "#059669" }, // emerald-600
+];
+
+const COLUMNS_SERVICIOS = COLUMNS.slice(0, 7);
+const COLUMNS_ALQUILERES = COLUMNS.slice(7, 10);
+
+export function FacturacionView() {
+  const [data, setData] = useState<FacturacionRow[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [moneda, setMoneda] = useState<Moneda>("USD");
+  const [yearSelected, setYearSelected] = useState<number | "ALL">("ALL");
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
+    Object.fromEntries(COLUMNS.map(c => [c.key, true]))
+  );
+  
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        setLoading(true);
+        const res = await fetch("/api/facturacion", { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (cancelled) return;
+        setData(json.data);
+        setError(null);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const availableYears = useMemo(() => {
+    if (!data) return [];
+    const ys = new Set<number>();
+    data.forEach(d => ys.add(d.ano));
+    return Array.from(ys).sort();
+  }, [data]);
+
+  const filteredAndConvertedData = useMemo(() => {
+    if (!data) return [];
+    
+    // Filtro por año
+    let filtered = data;
+    if (yearSelected !== "ALL") {
+      filtered = data.filter(d => d.ano === yearSelected);
+    }
+    
+    // Conversión de moneda
+    return filtered.map(row => {
+      const multiplier = moneda === "BOB" ? row.tc : 1;
+      const newRow: any = {
+        name: `${row.mes.substring(0,3)} ${row.ano}`,
+      };
+      COLUMNS.forEach(c => {
+        newRow[c.key] = (row as any)[c.key] * multiplier;
+      });
+      return newRow;
+    });
+  }, [data, yearSelected, moneda]);
+
+  const toggleColumn = (key: string) => {
+    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  if (loading && !data) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center text-slate-500">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Cargando facturación…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="m-8 rounded-xl border border-rose-200 bg-rose-50 p-6 text-rose-800">
+        <div className="flex items-center gap-2 font-semibold">
+          <AlertTriangle className="h-5 w-5" />
+          Error al cargar datos
+        </div>
+        <pre className="mt-3 text-sm">{error}</pre>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-6 lg:p-8">
+      {/* Header & Filtros */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+            Facturación
+          </h1>
+          <p className="mt-1 text-sm font-semibold uppercase tracking-wider text-blue-700">
+            Módulo de ingresos P&L
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          {/* Año */}
+          <div className="h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-3 w-3 text-slate-500" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Año
+              </span>
+            </div>
+            <select
+              value={yearSelected}
+              onChange={(e) => setYearSelected(e.target.value === "ALL" ? "ALL" : parseInt(e.target.value, 10))}
+              className="mt-0.5 cursor-pointer bg-transparent text-sm font-semibold tabular-nums text-slate-800 outline-none"
+            >
+              <option value="ALL">Todos los años</option>
+              {availableYears.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Moneda */}
+          <div className="h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <Coins className="h-3 w-3 text-slate-500" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Moneda (TC Paralelo)
+              </span>
+            </div>
+            <div className="mt-1 inline-flex rounded-md bg-slate-100 p-0.5">
+              <button
+                onClick={() => setMoneda("BOB")}
+                className={cn(
+                  "rounded px-3 py-1 text-xs font-semibold tabular-nums transition-colors",
+                  moneda === "BOB" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Bs.
+              </button>
+              <button
+                onClick={() => setMoneda("USD")}
+                className={cn(
+                  "rounded px-3 py-1 text-xs font-semibold tabular-nums transition-colors",
+                  moneda === "USD" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                USD
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Gráfico 1: General (Todas las columnas con selector) */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <h2 className="text-lg font-bold text-slate-800">Evolución General</h2>
+          
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 max-w-sm">
+            <div className="mb-2 flex items-center gap-2">
+              <Filter className="h-4 w-4 text-slate-500" />
+              <span className="text-xs font-semibold text-slate-600 uppercase">Filtrar Columnas</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {COLUMNS.map(c => (
+                <button
+                  key={c.key}
+                  onClick={() => toggleColumn(c.key)}
+                  className={cn(
+                    "rounded px-2 py-1 text-[10px] font-semibold transition-colors border",
+                    visibleColumns[c.key] 
+                      ? "bg-slate-800 text-white border-slate-800" 
+                      : "bg-white text-slate-400 border-slate-200 hover:bg-slate-100"
+                  )}
+                  style={visibleColumns[c.key] ? { backgroundColor: c.color, borderColor: c.color } : {}}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="h-[400px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={filteredAndConvertedData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <YAxis 
+                tick={{ fontSize: 12, fill: '#64748b' }} 
+                axisLine={false} 
+                tickLine={false} 
+                tickFormatter={(val) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(val)}
+              />
+              <Tooltip 
+                formatter={(value: number) => new Intl.NumberFormat("es-BO", { style: "currency", currency: moneda }).format(value)}
+                labelStyle={{ fontWeight: "bold", color: "#1e293b", marginBottom: "8px" }}
+                contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
+              />
+              <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "20px" }} />
+              {COLUMNS.map(c => visibleColumns[c.key] && (
+                <Line key={c.key} type="monotone" dataKey={c.key} name={c.label} stroke={c.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        {/* Gráfico 2: Facturación de Servicios */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-bold text-slate-800">Facturación de Servicios</h2>
+          <div className="h-[350px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={filteredAndConvertedData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis 
+                  tick={{ fontSize: 12, fill: '#64748b' }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tickFormatter={(val) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(val)}
+                />
+                <Tooltip 
+                  formatter={(value: number) => new Intl.NumberFormat("es-BO", { style: "currency", currency: moneda }).format(value)}
+                />
+                <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "20px" }} />
+                {COLUMNS_SERVICIOS.map(c => (
+                  <Line key={c.key} type="monotone" dataKey={c.key} name={c.label} stroke={c.color} strokeWidth={2} dot={{ r: 3 }} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Gráfico 3: Evolución de Alquileres */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-bold text-slate-800">Evolución de Alquileres</h2>
+          <div className="h-[350px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={filteredAndConvertedData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis 
+                  tick={{ fontSize: 12, fill: '#64748b' }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tickFormatter={(val) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(val)}
+                />
+                <Tooltip 
+                  formatter={(value: number) => new Intl.NumberFormat("es-BO", { style: "currency", currency: moneda }).format(value)}
+                />
+                <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "20px" }} />
+                {COLUMNS_ALQUILERES.map(c => (
+                  <Line key={c.key} type="monotone" dataKey={c.key} name={c.label} stroke={c.color} strokeWidth={2} dot={{ r: 3 }} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}

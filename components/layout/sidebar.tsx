@@ -28,7 +28,7 @@ const NAV = [
     icon: TableProperties,
   },
   { href: "/estado-resultados", label: "Estado de Resultados", icon: FileSpreadsheet },
-  { href: "/ingresos", label: "Ingresos", icon: TrendingUp },
+  { href: "/facturacion", label: "Facturación", icon: TrendingUp },
   { href: "/egresos", label: "Egresos", icon: TrendingDown },
   { href: "/categorias", label: "Categorías", icon: Tags },
   { href: "/diario", label: "Análisis Diario", icon: CalendarRange },
