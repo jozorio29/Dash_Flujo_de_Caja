@@ -13,6 +13,7 @@ import {
   CalendarDays,
   TableProperties,
   Sheet,
+  FileSpreadsheet,
   LogOut,
   PanelLeftClose,
 } from "lucide-react";
@@ -26,6 +27,7 @@ const NAV = [
     label: "Flujo de Caja Proyectado",
     icon: TableProperties,
   },
+  { href: "/estado-resultados", label: "Estado de Resultados", icon: FileSpreadsheet },
   { href: "/ingresos", label: "Ingresos", icon: TrendingUp },
   { href: "/egresos", label: "Egresos", icon: TrendingDown },
   { href: "/categorias", label: "Categorías", icon: Tags },

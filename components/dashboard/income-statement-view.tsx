@@ -1,0 +1,241 @@
+"use client";
+
+import { Fragment, useEffect, useState } from 'react';
+import { ChevronDown, ChevronRight, FileSpreadsheet, GripVertical, Plus, RefreshCw } from 'lucide-react';
+import { displayAmount, normalizeAmount, sumAmounts, type PLAccount, type PLData, type PLGroup } from '@/lib/pl-model';
+import { cn } from '@/lib/utils';
+
+const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEPT', 'OCT', 'NOV', 'DIC'];
+const tones: Record<string, string> = { SOCIOS: 'bg-blue-50 text-blue-900', INGRESOS: 'bg-emerald-50 text-emerald-900', EGRESOS: 'bg-rose-50 text-rose-900', INVERSION: 'bg-amber-50 text-amber-900' };
+const button = 'rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50';
+const firstCell = 'sticky left-0 z-10 min-w-[240px] max-w-[240px] border-b border-slate-200 px-4 py-3 text-left text-xs sm:min-w-[360px] sm:max-w-[360px]';
+
+function renderAmount(value: string | null) {
+  if (value !== null && /^-?0+(\.0+)?$/.test(value)) {
+    return <span className="text-slate-300" aria-label="0">—</span>;
+  }
+  return displayAmount(value);
+}
+
+export function IncomeStatementView() {
+  const [year, setYear] = useState(2026);
+  const [currency, setCurrency] = useState('USD');
+  const [data, setData] = useState<PLData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [revision, setRevision] = useState(0);
+  const [collapsed, setCollapsed] = useState(new Set<string>());
+  const [editing, setEditing] = useState<{ account: PLAccount; month: number; previous: string | null } | null>(null);
+  const [draft, setDraft] = useState('');
+  const [newGroup, setNewGroup] = useState<PLGroup | null>(null);
+  const [renaming, setRenaming] = useState<{ kind: 'accounts' | 'groups' | 'sections'; id: string; name: string } | null>(null);
+  const [dragging, setDragging] = useState<{kind: 'accounts' | 'groups'; id: string} | null>(null);
+  const [drop, setDrop] = useState<{id:string;position:'before'|'after'} | null>(null);
+  const [moving, setMoving] = useState(false);
+  const [name, setName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setError(''); setData(null);
+    fetch(`/api/estado-resultados?year=${year}&currency=${currency}`, { signal: controller.signal, cache: 'no-store' })
+      .then(async response => { const body = await response.json(); if (!response.ok) throw new Error(body.error || 'No se pudo cargar el P&L.'); return body as PLData; })
+      .then(body => { if (!controller.signal.aborted) setData(body); })
+      .catch(e => { if (!controller.signal.aborted) setError(e.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [year, currency, revision]);
+
+  useEffect(() => {
+    if (!editing && !newGroup && !renaming) return;
+    const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', guard);
+    return () => window.removeEventListener('beforeunload', guard);
+  }, [editing, newGroup, renaming]);
+
+  async function save() {
+    setFormError('');
+    let payload;
+    try {
+      payload = renaming ? { action: 'rename', kind: renaming.kind, id: renaming.id, previousName: renaming.name, name } : editing ? { action: 'value', accountId: editing.account.id, month: editing.month, year, currency, previous: editing.previous, amount: draft.trim() ? normalizeAmount(draft) : null } : { action: 'account', groupId: newGroup?.id, name };
+    } catch (e) { setFormError((e as Error).message); return; }
+    setSaving(true);
+    try {
+      const response = await fetch('/api/estado-resultados', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'No se pudo guardar.');
+      setData(previous => {
+        if (!previous) return previous;
+        if (renaming) return { ...previous, [renaming.kind]: previous[renaming.kind].map(record => record.id === renaming.id ? { ...record, name: body.record.name } : record) };
+        if (editing) return { ...previous, values: [...previous.values.filter(v => !(v.account_id === editing.account.id && v.month === editing.month)), ...(body.value ? [body.value] : [])] };
+        return { ...previous, accounts: [...previous.accounts, body.account] };
+      });
+      if (newGroup) setCollapsed(previous => { const next = new Set(previous); next.delete(newGroup.id); return next; });
+      setEditing(null); setNewGroup(null); setRenaming(null); setNotice('Cambios guardados en Supabase.');
+    } catch (e) { setFormError((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  async function removeAccount(id: string) {
+    setSaving(true); setFormError('');
+    try {
+      async function request(action: string) {
+        const response = await fetch('/api/estado-resultados', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, id }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'No se pudo completar la operación.');
+        return result;
+      }
+      const check = await request('remove-check');
+      const message = check.hasValues
+        ? `«${check.name}» tiene importes guardados. ¿Archivar esta cuenta? Sus importes se conservarán en los informes históricos y no podrá recibir nuevas cargas.`
+        : `¿Eliminar la fila «${check.name}»? No tiene importes en ningún año ni moneda. Esta acción no se puede deshacer.`;
+      if (!window.confirm(message)) return;
+      const result = await request(check.hasValues ? 'archive-account' : 'delete-account');
+      setData(previous => previous ? { ...previous, accounts: result.archived ? previous.accounts.map(a => a.id === id ? { ...a, active: false } : a) : previous.accounts.filter(a => a.id !== id) } : previous);
+      setRenaming(null);
+      setNotice(result.archived ? 'Cuenta archivada. Sus importes históricos se conservan.' : 'Fila eliminada.');
+    } catch (e) { setFormError((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  function visibleAccounts(accounts: PLAccount[]) {
+    return accounts.filter(a => a.active || data?.values.some(v => v.account_id === a.id));
+  }
+
+  function editableName(kind: 'accounts' | 'groups' | 'sections', record: { id: string; name: string }) {
+    if (!data?.canEdit) return <span>{record.name}</span>;
+    if (renaming?.kind === kind && renaming.id === record.id) {
+      return <form className="min-w-0 flex-1 normal-case tracking-normal" onSubmit={event => { event.preventDefault(); if (!saving) void save(); }}>
+        <input autoFocus aria-label={`Nombre de ${record.name}`} aria-describedby="pl-name-help" required maxLength={200} disabled={saving} value={name}
+          onFocus={event => event.currentTarget.select()} onChange={event => setName(event.target.value)}
+          onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape' && !saving) { event.preventDefault(); setRenaming(null); setFormError(''); } }}
+          className="w-full rounded-md border border-blue-300 bg-white px-2 py-1.5 text-xs text-slate-900 outline-none ring-2 ring-blue-100 disabled:opacity-60" />
+        <span id="pl-name-help" className="mt-1 block text-[10px] font-normal text-slate-500">{saving ? 'Guardando…' : 'Enter para guardar · Escape para cancelar'}</span>
+        {kind === 'accounts' && data.accounts.find(a => a.id === record.id)?.active && <button type="button" disabled={saving} onClick={() => void removeAccount(record.id)} className="mt-2 text-xs font-normal text-rose-600 hover:underline disabled:opacity-50">Eliminar fila</button>}
+        {formError && <span role="alert" className="mt-1 block text-xs font-normal text-rose-700">{formError}</span>}
+      </form>;
+    }
+    return <button type="button" disabled={Boolean(renaming) || saving || moving} title="Haz clic para editar el nombre" aria-label={`Editar nombre de ${record.name}`}
+      className="min-w-0 flex-1 rounded-md py-1 text-left font-inherit transition-colors hover:bg-blue-100/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
+      onClick={() => { setRenaming({ kind, id: record.id, name: record.name }); setName(record.name); setFormError(''); }}>{record.name}</button>;
+  }
+
+  function sameLevel(kind: 'accounts' | 'groups', id: string, target: string) {
+    if (!data) return false;
+    if (kind === 'accounts') return data.accounts.find(a => a.id === id)?.group_id === data.accounts.find(a => a.id === target)?.group_id;
+    const a = data.groups.find(g => g.id === id), b = data.groups.find(g => g.id === target);
+    return Boolean(a && b && a.section_id === b.section_id && a.parent_id === b.parent_id);
+  }
+  async function moveRow(kind: 'accounts' | 'groups', id: string, targetId: string, position: 'before' | 'after') {
+    setDragging(null); setDrop(null);
+    if (id === targetId || moving) return;
+    setMoving(true); setError(''); setNotice('Guardando orden…');
+    try {
+      const response = await fetch('/api/estado-resultados', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reorder',kind,id,targetId,position})});
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'No se pudo guardar el orden.');
+      setData(previous => previous ? {...previous, [kind]: previous[kind].map(row => ({...row, sort_order: body.order.find((o: {id:string;sort_order:number}) => o.id === row.id)?.sort_order ?? row.sort_order})).sort((a,b) => a.sort_order-b.sort_order || a.id.localeCompare(b.id))} : previous);
+      setNotice('Orden guardado.');
+    } catch (e) { setNotice(''); setError((e as Error).message + ' Pulsa Actualizar para consultar el orden guardado.'); }
+    finally { setMoving(false); }
+  }
+  function dragHandle(kind: 'accounts' | 'groups', record: {id:string;name:string}) {
+    if (!data?.canEdit) return null;
+    return <button type="button" draggable={!modal && !saving} disabled={modal || saving} aria-label={`Mover ${record.name}`} title="Arrastra para mover. También puedes usar las flechas ↑ y ↓."
+      className="absolute left-0 top-0 flex h-full w-5 cursor-grab items-center justify-center text-slate-300 hover:bg-blue-100/60 hover:text-blue-600 active:cursor-grabbing disabled:cursor-default"
+      onDragStart={e => { setDragging({kind,id:record.id}); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',record.id); }} onDragEnd={() => {setDragging(null);setDrop(null);}}
+      onKeyDown={e => { if (!['ArrowUp','ArrowDown'].includes(e.key) || !data) return; e.preventDefault(); const peers=data[kind].filter(r => sameLevel(kind,record.id,r.id)); const index=peers.findIndex(r=>r.id===record.id); const target=peers[index+(e.key==='ArrowUp'?-1:1)]; if(target) void moveRow(kind,record.id,target.id,e.key==='ArrowUp'?'before':'after'); }}><GripVertical className="h-3 w-3" /></button>;
+  }
+  function dropProps(kind: 'accounts' | 'groups', id: string) {
+    return {
+      onDragOver: (e: React.DragEvent<HTMLTableRowElement>) => {
+        if (!dragging || dragging.kind !== kind || !sameLevel(kind,dragging.id,id) || moving) return;
+        e.preventDefault(); e.dataTransfer.dropEffect='move'; const rect=e.currentTarget.getBoundingClientRect(); setDrop({id,position:e.clientY < rect.top+rect.height/2?'before':'after'});
+        const scroller=e.currentTarget.closest('[role="region"]'); if(scroller) {const bounds=scroller.getBoundingClientRect(); if(e.clientY>bounds.bottom-45) scroller.scrollTop+=20; else if(e.clientY<bounds.top+65) scroller.scrollTop-=20;}
+      },
+      onDrop: (e: React.DragEvent<HTMLTableRowElement>) => {e.preventDefault(); if(dragging && drop?.id===id && dragging.kind===kind && sameLevel(kind,dragging.id,id)) void moveRow(kind,dragging.id,id,drop.position);},
+    };
+  }
+  function dropLine(id: string) { return drop?.id === id ? (drop.position === 'before' ? 'inset 0 3px #2563eb' : 'inset 0 -3px #2563eb') : undefined; }
+
+  function groupAccounts(groupId: string, seen = new Set<string>()): PLAccount[] {
+    if (!data || seen.has(groupId)) return [];
+    seen.add(groupId);
+    return [...data.accounts.filter(a => a.group_id === groupId), ...data.groups.filter(g => g.parent_id === groupId).flatMap(g => groupAccounts(g.id, seen))];
+  }
+  function valuesFor(accounts: PLAccount[], month?: number) {
+    const ids = new Set(accounts.map(a => a.id));
+    return (data?.values || []).filter(v => ids.has(v.account_id) && (month === undefined || v.month === month)).map(v => v.amount);
+  }
+  function cells(accounts: PLAccount[], account?: PLAccount) {
+    return <>{months.map((label, i) => {
+      const value = data?.values.find(v => v.account_id === account?.id && v.month === i + 1);
+      const amount = sumAmounts(valuesFor(accounts, i + 1));
+      return <td key={label} className="h-10 min-w-[104px] border-b border-l border-slate-200/60 text-right text-xs tabular-nums">
+        {account && data?.canEdit && account.active ? <button type="button" disabled={Boolean(renaming) || moving} className="h-full min-h-10 w-full px-3 py-2 text-right hover:bg-blue-100/60 focus-visible:outline-blue-500" aria-label={`Editar ${account.name}, ${label} ${year}, ${currency}: ${displayAmount(amount) || 'sin datos'}`} onClick={() => { setEditing({ account, month: i + 1, previous: value?.updated_at || null }); setDraft(value?.amount || ''); setFormError(''); }}>{renderAmount(amount)}</button> : <span className="px-3" aria-label={amount === null ? 'Sin datos' : undefined}>{renderAmount(amount)}</span>}
+      </td>;
+    })}<td className="min-w-[112px] border-b border-l border-slate-200/60 px-3 text-right text-xs font-semibold tabular-nums">{renderAmount(sumAmounts(valuesFor(accounts)))}</td></>;
+  }
+  function renderGroup(group: PLGroup, depth = 0, seen = new Set<string>()): React.ReactNode {
+    if (!data || seen.has(group.id)) return null;
+    const next = new Set(seen); next.add(group.id);
+    const accounts = visibleAccounts(data.accounts.filter(a => a.group_id === group.id));
+    const children = data.groups.filter(g => g.parent_id === group.id);
+    return <Fragment key={group.id}>
+      <tr {...dropProps('groups', group.id)} className="bg-slate-50"><th scope="row" className={cn(firstCell, 'bg-slate-50 font-semibold text-slate-700')} style={{ paddingLeft: 24 + depth * 16, boxShadow: dropLine(group.id) }}>{dragHandle('groups', group)}
+        <div className="flex items-center gap-2"><button type="button" className="flex shrink-0 items-center rounded p-1 text-left hover:bg-blue-100" disabled={Boolean(renaming) || moving} aria-label={`Expandir o contraer ${group.name}`} aria-expanded={!collapsed.has(group.id)} onClick={() => setCollapsed(previous => { const result = new Set(previous); if (result.has(group.id)) result.delete(group.id); else result.add(group.id); return result; })}>
+          {collapsed.has(group.id) ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}</button>{editableName('groups', group)}
+          {data.canEdit && <button type="button" disabled={Boolean(renaming) || moving} aria-label={`Agregar cuenta en ${group.name}`} title="Agregar cuenta" className="rounded p-1 hover:bg-blue-100" onClick={() => { setNewGroup(group); setName(''); setFormError(''); }}><Plus className="h-4 w-4" /></button>}
+        </div></th>{cells(groupAccounts(group.id))}</tr>
+      {!collapsed.has(group.id) && <>{accounts.map(account => <tr key={account.id} {...dropProps('accounts', account.id)} className="hover:bg-blue-50/40"><th scope="row" className={cn(firstCell, 'bg-white font-normal text-slate-600')} style={{ paddingLeft: 40 + depth * 16, boxShadow: dropLine(account.id) }}>{dragHandle('accounts', account)}<span className="inline-flex w-full items-center justify-between gap-2">{editableName('accounts', account)}</span>{!account.active && <span className="ml-2 text-slate-400">(archivada)</span>}</th>{cells([account], account)}</tr>)}{children.map(child => renderGroup(child, depth + 1, next))}
+      {!accounts.length && !children.length && <tr><td colSpan={14} className="border-b bg-white px-10 py-3 text-xs text-slate-400">Todavía no hay cuentas en este grupo.</td></tr>}</>}
+    </Fragment>;
+  }
+  function operatingResult(month: number): string | null {
+    if (!data) return null;
+    const getSection = (code: string) => {
+      const section = data.sections.find(s => s.code === code);
+      const ids = new Set(data.groups.filter(g => g.section_id === section?.id).map(g => g.id));
+      return visibleAccounts(data.accounts.filter(a => ids.has(a.group_id)));
+    };
+    const income = getSection('INGRESOS'), expenses = getSection('EGRESOS');
+    const incoming = valuesFor(income, month), outgoing = valuesFor(expenses, month);
+    if (!income.length || !expenses.length || incoming.length !== income.length || outgoing.length !== expenses.length) return null;
+    return sumAmounts([...incoming, ...outgoing.map(value => value.startsWith('-') ? value.slice(1) : '-' + value)]);
+  }
+  const results = months.map((_, i) => operatingResult(i + 1));
+  const modal = Boolean(editing || newGroup || renaming || moving);
+  return <div className="space-y-6 p-4 md:p-6 lg:p-8">
+    <header className="flex flex-wrap items-start justify-between gap-4"><div><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-blue-600"><FileSpreadsheet className="h-4 w-4" />Reportes financieros</div><h1 className="text-2xl font-bold tracking-tight text-slate-900">Estado de Resultados</h1><p className="mt-2 text-sm text-slate-500">Europe Intelligence Solutions · Sucursal Bolivia</p></div><span className="rounded-full border bg-white px-3 py-1.5 text-xs text-slate-600">{loading ? 'Cargando…' : data ? (data.canEdit ? 'Edición habilitada' : 'Solo lectura') : 'Sin conexión'}</span></header>
+    <div className="flex flex-wrap items-end justify-between gap-4 rounded-xl border bg-white p-4 shadow-sm"><div className="flex gap-4">
+      <label className="text-xs text-slate-500">Ejercicio<select className="mt-2 block rounded-lg border bg-white px-3 py-2 text-sm text-slate-900" value={year} disabled={modal} onChange={e => { setYear(Number(e.target.value)); setNotice(''); }}>{[2025, 2026, 2027].map(y => <option key={y}>{y}</option>)}</select></label>
+      <label className="text-xs text-slate-500">Moneda de los importes<select className="mt-2 block rounded-lg border bg-white px-3 py-2 text-sm text-slate-900" value={currency} disabled={modal} onChange={e => { setCurrency(e.target.value); setNotice(''); }}><option value="USD">USD · Dólares</option><option value="BOB">BOB · Bolivianos</option></select></label></div>
+      <div className="flex flex-wrap gap-2"><button className={button} disabled={modal} onClick={() => setCollapsed(new Set())}>Expandir todo</button><button className={button} disabled={modal} onClick={() => setCollapsed(new Set(data?.groups.map(g => g.id)))}>Contraer todo</button><button className={button} disabled={loading || modal} onClick={() => { setRevision(r => r + 1); setNotice(''); }}><RefreshCw className="mr-1 inline h-3 w-3" />Actualizar</button></div></div>
+    {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
+    {error && <p role="alert" className="rounded-lg bg-rose-50 p-4 text-sm text-rose-800">{error}</p>}
+    {loading && <p role="status" className="p-6 text-sm text-slate-500">Cargando cuentas e importes…</p>}
+    {data && <section className="overflow-hidden rounded-xl border bg-white shadow-sm" aria-label="Estado de resultados mensual">
+      <div className="flex flex-wrap justify-between gap-2 border-b px-5 py-4"><h2 className="text-sm font-semibold">P&amp;L / {year}</h2><span className="text-xs text-slate-500">{currency} · {data.accounts.length} cuentas · {data.values.length ? 'Totales sobre importes cargados' : 'Importes pendientes de carga'}</span></div>
+      <div tabIndex={0} role="region" aria-label="Tabla mensual con desplazamiento" className="max-h-[72vh] overflow-auto"><table className="w-full border-separate border-spacing-0 text-sm"><caption className="sr-only">Estado de resultados {year}, {currency}. Las celdas vacías indican datos pendientes.</caption><thead className="sticky top-0 z-30"><tr className="text-xs text-white"><th className={cn(firstCell, 'z-40 bg-[#0B1B3B]')}>Concepto / Cuenta</th>{months.map(month => <th key={month} className="min-w-[104px] border-l border-slate-700 bg-[#0B1B3B] px-3 py-4 text-right font-medium">{month}-{String(year).slice(-2)}</th>)}<th className="min-w-[112px] bg-[#132B51] px-3 py-4 text-right">Total anual</th></tr></thead><tbody>
+        {data.sections.map(section => {
+          const groups = data.groups.filter(g => g.section_id === section.id);
+          const ids = new Set(groups.map(g => g.id));
+          const accounts = data.accounts.filter(a => ids.has(a.group_id));
+          return <Fragment key={section.id}><tr className={tones[section.code] || 'bg-blue-50'}><th className={cn(firstCell, 'font-bold uppercase tracking-wider', tones[section.code] || 'bg-blue-50')}><span className="flex items-center justify-between gap-2">{editableName('sections', section)}</span></th>{cells([])}</tr>{groups.filter(g => !g.parent_id).map(g => renderGroup(g))}
+            {!groups.length && <tr><td colSpan={14} className="px-5 py-4 text-xs text-slate-400">Catálogo pendiente de cargar.</td></tr>}
+            <tr className="bg-[#193D6B] text-white"><th className={cn(firstCell, 'bg-[#193D6B]')}>Total {section.name.toLowerCase()}</th>{cells(accounts)}</tr>
+            {section.code === 'EGRESOS' && <tr className="bg-[#0B1B3B] text-white"><th className={cn(firstCell, 'bg-[#0B1B3B]')}>Resultado operativo</th>{results.map((value, i) => <td key={i} title={value === null ? 'Completa los ingresos y egresos del mes, incluyendo los ceros.' : undefined} className="border-b border-l border-slate-700 px-3 text-right text-xs">{renderAmount(value)}</td>)}<td className="border-l border-slate-700 px-3 text-right text-xs">{renderAmount(results.every(v => v !== null) ? sumAmounts(results as string[]) : null)}</td></tr>}
+            <tr aria-hidden="true"><td colSpan={14} className="h-5" /></tr></Fragment>;
+        })}
+      </tbody></table></div><p className="border-t px-5 py-3 text-xs leading-relaxed text-slate-500">{data.canEdit ? 'Haz clic en una celda para cargar un importe y pulsa Guardar. Haz clic en un nombre para editarlo y pulsa Enter para guardar; Escape cancela. Usa + para agregar una cuenta.' : 'Consulta disponible. La edición requiere que tu correo esté habilitado por el administrador.'} Los totales suman únicamente valores cargados; un mes vacío no equivale a cero. USD y BOB se cargan por separado. El resultado operativo se muestra cuando todas las cuentas de ingresos y egresos del mes tienen un importe, incluyendo los ceros.</p>
+    </section>}
+    {(editing || newGroup) && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"><form role="dialog" aria-modal="true" aria-labelledby="pl-edit-title" className="w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-xl" onSubmit={e => { e.preventDefault(); void save(); }} onKeyDown={e => { if (e.key === 'Escape' && !saving) { setEditing(null); setNewGroup(null); setRenaming(null); } if (e.key === 'Tab') { const nodes = e.currentTarget.querySelectorAll<HTMLElement>('input,button:not(:disabled)'); const first = nodes[0], last = nodes[nodes.length - 1]; if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); } } }}>
+      <h2 id="pl-edit-title" className="text-lg font-semibold">{editing ? 'Editar importe' : renaming ? 'Editar nombre' : 'Agregar cuenta'}</h2><p className="text-sm text-slate-500">{editing ? `${editing.account.name} · ${months[editing.month - 1]} ${year} · ${currency}` : renaming?.name || newGroup?.name}</p>
+      <label className="block text-sm">{editing ? 'Importe' : 'Nombre'}<input autoFocus disabled={saving} className="mt-2 w-full rounded-lg border px-3 py-2" inputMode={editing ? 'decimal' : 'text'} value={editing ? draft : name} maxLength={editing ? 23 : 200} required={!editing} onChange={e => editing ? setDraft(e.target.value) : setName(e.target.value)} /></label>
+      {editing && <p className="text-xs text-slate-500">Sin separadores de miles. Ejemplo: 38377,50. Deja vacío para quitar el importe de este mes.</p>}
+      {formError && <p role="alert" className="text-sm text-rose-700">{formError}</p>}<div className="flex justify-end gap-2"><button type="button" className={button} disabled={saving} onClick={() => { setEditing(null); setNewGroup(null); setRenaming(null); }}>Cancelar</button><button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button></div>
+    </form></div>}
+  </div>;
+}
