@@ -52,6 +52,21 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ order: ordered.map((row,index) => ({id:row.id,sort_order:(index+1)*10})) });
     }
+    if (['remove-group-check', 'delete-group'].includes(body.action)) {
+      if (typeof body.id !== 'string' || !uuid.test(body.id)) return error('Grupo inválido.');
+      const groups = await plRequest<PLGroup[]>('pl_groups', `select=*&id=eq.${body.id}`);
+      if (!groups.length) return error('El grupo ya no existe.', 404);
+      const children = await plRequest<Array<{ id: string }>>('pl_groups', `select=id&parent_id=eq.${body.id}`);
+      const accounts = await plRequest<PLAccount[]>('pl_accounts', `select=*&group_id=eq.${body.id}`);
+      const values = (await Promise.all(accounts.map(account => plRequest<Array<{ id: string }>>('pl_monthly_values', `select=id&account_id=eq.${account.id}&limit=1`)))).some(rows => rows.length > 0);
+      const canDelete = !children.length && !values;
+      if (body.action === 'remove-group-check') return NextResponse.json({ name: groups[0].name, accountCount: accounts.length, hasValues: values, hasChildren: children.length > 0, canDelete });
+      if (!canDelete) return error('El grupo contiene subgrupos o importes históricos y no se puede eliminar.', 409);
+      for (const account of accounts) await plRequest('pl_accounts', `id=eq.${account.id}`, { method: 'DELETE' });
+      const deleted = await plRequest<PLGroup[]>('pl_groups', `id=eq.${body.id}`, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
+      if (!deleted.length) return error('El grupo cambió. Actualiza los datos.', 409);
+      return NextResponse.json({ group: deleted[0], accountIds: accounts.map(account => account.id) });
+    }
     if (['remove-check', 'delete-account', 'archive-account'].includes(body.action)) {
       if (typeof body.id !== 'string' || !uuid.test(body.id)) return error('Cuenta inválida.');
       const accounts = await plRequest<PLAccount[]>('pl_accounts', `select=*&id=eq.${body.id}`);
@@ -76,6 +91,20 @@ export async function POST(request: Request) {
       const rows = await plRequest<Array<{ id: string; name: string }>>(tables[body.kind], query.toString(), { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: body.name.trim() }) });
       if (!rows.length) return error('El nombre cambió o el registro ya no existe. Actualiza antes de guardar.', 409);
       return NextResponse.json({ record: rows[0] });
+    }
+    if (body.action === 'group') {
+      if (typeof body.sectionId !== 'string' || !uuid.test(body.sectionId) || typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 200) return error('Sección o nombre inválidos.');
+      const sections = await plRequest<Array<{ id: string }>>('pl_sections', `select=id&id=eq.${body.sectionId}`);
+      if (!sections.length) return error('La sección no existe.', 404);
+      let parentId: string | null = null;
+      if (body.parentId !== undefined) {
+        if (typeof body.parentId !== 'string' || !uuid.test(body.parentId)) return error('Grupo padre inválido.');
+        const parents = await plRequest<PLGroup[]>('pl_groups', `select=id,section_id&id=eq.${body.parentId}`);
+        if (!parents.length || parents[0].section_id !== body.sectionId) return error('El grupo padre no pertenece a la sección.', 409);
+        parentId = body.parentId;
+      }
+      const rows = await plRequest<PLGroup[]>('pl_groups', '', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ section_id: body.sectionId, parent_id: parentId, name: body.name.trim(), code: `WEB_${crypto.randomUUID()}`, sort_order: 10000 }) });
+      return NextResponse.json({ group: rows[0] });
     }
     if (body.action === 'account') {
       if (typeof body.groupId !== 'string' || !uuid.test(body.groupId) || typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 200) return error('Grupo o nombre inválidos.');
