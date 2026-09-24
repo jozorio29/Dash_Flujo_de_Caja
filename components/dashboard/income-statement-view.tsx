@@ -1,8 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, FileSpreadsheet, GripVertical, Plus, RefreshCw } from 'lucide-react';
-import { displayAmount, normalizeAmount, sumAmounts, type PLAccount, type PLData, type PLGroup } from '@/lib/pl-model';
+import { AlertTriangle, ChevronDown, ChevronRight, FileSpreadsheet, GripVertical, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { displayAmount, normalizeAmount, sumAmounts, type PLAccount, type PLData, type PLGroup, type PLSection } from '@/lib/pl-model';
 import { cn } from '@/lib/utils';
 
 const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEPT', 'OCT', 'NOV', 'DIC'];
@@ -29,6 +29,7 @@ export function IncomeStatementView() {
   const [editing, setEditing] = useState<{ account: PLAccount; month: number; previous: string | null } | null>(null);
   const [draft, setDraft] = useState('');
   const [newGroup, setNewGroup] = useState<PLGroup | null>(null);
+  const [newSection, setNewSection] = useState<PLSection | null>(null);
   const [renaming, setRenaming] = useState<{ kind: 'accounts' | 'groups' | 'sections'; id: string; name: string } | null>(null);
   const [dragging, setDragging] = useState<{kind: 'accounts' | 'groups'; id: string} | null>(null);
   const [drop, setDrop] = useState<{id:string;position:'before'|'after'} | null>(null);
@@ -36,6 +37,8 @@ export function IncomeStatementView() {
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [removalConfirmation, setRemovalConfirmation] = useState<{ id: string; name: string; hasValues: boolean } | null>(null);
+  const [groupRemovalConfirmation, setGroupRemovalConfirmation] = useState<{ id: string; name: string; accountCount: number; hasValues: boolean; hasChildren: boolean; canDelete: boolean } | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -49,17 +52,17 @@ export function IncomeStatementView() {
   }, [year, currency, revision]);
 
   useEffect(() => {
-    if (!editing && !newGroup && !renaming) return;
+    if (!editing && !newGroup && !newSection && !renaming) return;
     const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
     window.addEventListener('beforeunload', guard);
     return () => window.removeEventListener('beforeunload', guard);
-  }, [editing, newGroup, renaming]);
+  }, [editing, newGroup, newSection, renaming]);
 
   async function save() {
     setFormError('');
     let payload;
     try {
-      payload = renaming ? { action: 'rename', kind: renaming.kind, id: renaming.id, previousName: renaming.name, name } : editing ? { action: 'value', accountId: editing.account.id, month: editing.month, year, currency, previous: editing.previous, amount: draft.trim() ? normalizeAmount(draft) : null } : { action: 'account', groupId: newGroup?.id, name };
+      payload = renaming ? { action: 'rename', kind: renaming.kind, id: renaming.id, previousName: renaming.name, name } : newSection ? { action: 'group', sectionId: newSection.id, name } : editing ? { action: 'value', accountId: editing.account.id, month: editing.month, year, currency, previous: editing.previous, amount: draft.trim() ? normalizeAmount(draft) : null } : { action: 'account', groupId: newGroup?.id, name };
     } catch (e) { setFormError((e as Error).message); return; }
     setSaving(true);
     try {
@@ -70,10 +73,11 @@ export function IncomeStatementView() {
         if (!previous) return previous;
         if (renaming) return { ...previous, [renaming.kind]: previous[renaming.kind].map(record => record.id === renaming.id ? { ...record, name: body.record.name } : record) };
         if (editing) return { ...previous, values: [...previous.values.filter(v => !(v.account_id === editing.account.id && v.month === editing.month)), ...(body.value ? [body.value] : [])] };
+        if (newSection) return { ...previous, groups: [...previous.groups, body.group] };
         return { ...previous, accounts: [...previous.accounts, body.account] };
       });
       if (newGroup) setCollapsed(previous => { const next = new Set(previous); next.delete(newGroup.id); return next; });
-      setEditing(null); setNewGroup(null); setRenaming(null); setNotice('Cambios guardados en Supabase.');
+      setEditing(null); setNewGroup(null); setNewSection(null); setRenaming(null); setNotice('Cambios guardados en Supabase.');
     } catch (e) { setFormError((e as Error).message); }
     finally { setSaving(false); }
   }
@@ -88,14 +92,47 @@ export function IncomeStatementView() {
         return result;
       }
       const check = await request('remove-check');
-      const message = check.hasValues
-        ? `«${check.name}» tiene importes guardados. ¿Archivar esta cuenta? Sus importes se conservarán en los informes históricos y no podrá recibir nuevas cargas.`
-        : `¿Eliminar la fila «${check.name}»? No tiene importes en ningún año ni moneda. Esta acción no se puede deshacer.`;
-      if (!window.confirm(message)) return;
-      const result = await request(check.hasValues ? 'archive-account' : 'delete-account');
-      setData(previous => previous ? { ...previous, accounts: result.archived ? previous.accounts.map(a => a.id === id ? { ...a, active: false } : a) : previous.accounts.filter(a => a.id !== id) } : previous);
+      setRemovalConfirmation({ id, name: check.name, hasValues: check.hasValues });
+    } catch (e) { setFormError((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  async function confirmAccountRemoval() {
+    if (!removalConfirmation) return;
+    setSaving(true); setFormError('');
+    try {
+      const response = await fetch('/api/estado-resultados', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: removalConfirmation.hasValues ? 'archive-account' : 'delete-account', id: removalConfirmation.id }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'No se pudo completar la operación.');
+      setData(previous => previous ? { ...previous, accounts: result.archived ? previous.accounts.map(a => a.id === removalConfirmation.id ? { ...a, active: false } : a) : previous.accounts.filter(a => a.id !== removalConfirmation.id) } : previous);
+      setRemovalConfirmation(null);
       setRenaming(null);
       setNotice(result.archived ? 'Cuenta archivada. Sus importes históricos se conservan.' : 'Fila eliminada.');
+    } catch (e) { setFormError((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  async function removeGroup(id: string) {
+    setSaving(true); setFormError('');
+    try {
+      const response = await fetch('/api/estado-resultados', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remove-group-check', id }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'No se pudo comprobar el grupo.');
+      setGroupRemovalConfirmation({ ...result, id });
+    } catch (e) { setFormError((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  async function confirmGroupRemoval() {
+    if (!groupRemovalConfirmation?.canDelete) return;
+    setSaving(true); setFormError('');
+    try {
+      const response = await fetch('/api/estado-resultados', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete-group', id: groupRemovalConfirmation.id }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'No se pudo eliminar el grupo.');
+      setData(previous => previous ? { ...previous, groups: previous.groups.filter(group => group.id !== groupRemovalConfirmation.id), accounts: previous.accounts.filter(account => !result.accountIds.includes(account.id)) } : previous);
+      setGroupRemovalConfirmation(null);
+      setNotice('Grupo eliminado.');
     } catch (e) { setFormError((e as Error).message); }
     finally { setSaving(false); }
   }
@@ -144,7 +181,7 @@ export function IncomeStatementView() {
   function dragHandle(kind: 'accounts' | 'groups', record: {id:string;name:string}) {
     if (!data?.canEdit) return null;
     return <button type="button" draggable={!modal && !saving} disabled={modal || saving} aria-label={`Mover ${record.name}`} title="Arrastra para mover. También puedes usar las flechas ↑ y ↓."
-      className="absolute left-0 top-0 flex h-full w-5 cursor-grab items-center justify-center text-slate-300 hover:bg-blue-100/60 hover:text-blue-600 active:cursor-grabbing disabled:cursor-default"
+      className="absolute left-0 top-0 flex h-full w-5 cursor-grab items-center justify-center text-slate-300 opacity-0 transition-opacity hover:bg-blue-100/60 hover:text-blue-600 hover:opacity-100 focus-visible:opacity-100 active:cursor-grabbing active:opacity-100 disabled:cursor-default"
       onDragStart={e => { setDragging({kind,id:record.id}); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',record.id); }} onDragEnd={() => {setDragging(null);setDrop(null);}}
       onKeyDown={e => { if (!['ArrowUp','ArrowDown'].includes(e.key) || !data) return; e.preventDefault(); const peers=data[kind].filter(r => sameLevel(kind,record.id,r.id)); const index=peers.findIndex(r=>r.id===record.id); const target=peers[index+(e.key==='ArrowUp'?-1:1)]; if(target) void moveRow(kind,record.id,target.id,e.key==='ArrowUp'?'before':'after'); }}><GripVertical className="h-3 w-3" /></button>;
   }
@@ -185,11 +222,11 @@ export function IncomeStatementView() {
     const children = data.groups.filter(g => g.parent_id === group.id);
     return <Fragment key={group.id}>
       <tr {...dropProps('groups', group.id)} className="bg-slate-50"><th scope="row" className={cn(firstCell, 'bg-slate-50 font-semibold text-slate-700')} style={{ paddingLeft: 24 + depth * 16, boxShadow: dropLine(group.id) }}>{dragHandle('groups', group)}
-        <div className="flex items-center gap-2"><button type="button" className="flex shrink-0 items-center rounded p-1 text-left hover:bg-blue-100" disabled={Boolean(renaming) || moving} aria-label={`Expandir o contraer ${group.name}`} aria-expanded={!collapsed.has(group.id)} onClick={() => setCollapsed(previous => { const result = new Set(previous); if (result.has(group.id)) result.delete(group.id); else result.add(group.id); return result; })}>
+        <div className="group/account flex items-center gap-2"><button type="button" className="flex shrink-0 items-center rounded p-1 text-left hover:bg-blue-100" disabled={Boolean(renaming) || moving} aria-label={`Expandir o contraer ${group.name}`} aria-expanded={!collapsed.has(group.id)} onClick={() => setCollapsed(previous => { const result = new Set(previous); if (result.has(group.id)) result.delete(group.id); else result.add(group.id); return result; })}>
           {collapsed.has(group.id) ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}</button>{editableName('groups', group)}
-          {data.canEdit && <button type="button" disabled={Boolean(renaming) || moving} aria-label={`Agregar cuenta en ${group.name}`} title="Agregar cuenta" className="rounded p-1 hover:bg-blue-100" onClick={() => { setNewGroup(group); setName(''); setFormError(''); }}><Plus className="h-4 w-4" /></button>}
+          {data.canEdit && <><button type="button" disabled={Boolean(renaming) || moving} aria-label={`Agregar cuenta en ${group.name}`} title="Agregar cuenta" className="rounded p-1 opacity-0 transition-opacity hover:bg-blue-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 group-hover/account:opacity-100 disabled:opacity-0" onClick={() => { setNewGroup(group); setName(''); setFormError(''); }}><Plus className="h-4 w-4" /></button><button type="button" disabled={Boolean(renaming) || moving} aria-label={`Eliminar grupo ${group.name}`} title={`Eliminar grupo ${group.name}`} className="rounded p-1 text-rose-600 opacity-0 transition-opacity hover:bg-rose-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-400 group-hover/account:opacity-100 disabled:opacity-0" onClick={() => void removeGroup(group.id)}><Trash2 className="h-4 w-4" /></button></>}
         </div></th>{cells(groupAccounts(group.id))}</tr>
-      {!collapsed.has(group.id) && <>{accounts.map(account => <tr key={account.id} {...dropProps('accounts', account.id)} className="hover:bg-blue-50/40"><th scope="row" className={cn(firstCell, 'bg-white font-normal text-slate-600')} style={{ paddingLeft: 40 + depth * 16, boxShadow: dropLine(account.id) }}>{dragHandle('accounts', account)}<span className="inline-flex w-full items-center justify-between gap-2">{editableName('accounts', account)}</span>{!account.active && <span className="ml-2 text-slate-400">(archivada)</span>}</th>{cells([account], account)}</tr>)}{children.map(child => renderGroup(child, depth + 1, next))}
+      {!collapsed.has(group.id) && <>{accounts.map(account => <tr key={account.id} {...dropProps('accounts', account.id)} className="hover:bg-blue-50/40"><th scope="row" className={cn(firstCell, 'bg-white font-normal text-slate-600')} style={{ paddingLeft: 40 + depth * 16, boxShadow: dropLine(account.id) }}>{dragHandle('accounts', account)}<span className="group/account-row inline-flex w-full items-center justify-between gap-2">{editableName('accounts', account)}{account.active && data.canEdit && !(renaming?.kind === 'accounts' && renaming.id === account.id) && <button type="button" disabled={saving || moving} aria-label={`Eliminar ${account.name}`} title={`Eliminar ${account.name}`} className="rounded p-1 text-rose-600 opacity-0 transition-opacity hover:bg-rose-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-400 group-hover/account-row:opacity-100 disabled:opacity-0" onClick={() => void removeAccount(account.id)}><Trash2 className="h-4 w-4" /></button>}</span>{!account.active && <span className="ml-2 text-slate-400">(archivada)</span>}</th>{cells([account], account)}</tr>)}{children.map(child => renderGroup(child, depth + 1, next))}
       {!accounts.length && !children.length && <tr><td colSpan={14} className="border-b bg-white px-10 py-3 text-xs text-slate-400">Todavía no hay cuentas en este grupo.</td></tr>}</>}
     </Fragment>;
   }
@@ -206,7 +243,7 @@ export function IncomeStatementView() {
     return sumAmounts([...incoming, ...outgoing.map(value => value.startsWith('-') ? value.slice(1) : '-' + value)]);
   }
   const results = months.map((_, i) => operatingResult(i + 1));
-  const modal = Boolean(editing || newGroup || renaming || moving);
+  const modal = Boolean(editing || newGroup || newSection || renaming || moving || removalConfirmation || groupRemovalConfirmation);
   return <div className="space-y-6 p-4 md:p-6 lg:p-8">
     <header className="flex flex-wrap items-start justify-between gap-4"><div><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-blue-600"><FileSpreadsheet className="h-4 w-4" />Reportes financieros</div><h1 className="text-2xl font-bold tracking-tight text-slate-900">Estado de Resultados</h1><p className="mt-2 text-sm text-slate-500">Europe Intelligence Solutions · Sucursal Bolivia</p></div><span className="rounded-full border bg-white px-3 py-1.5 text-xs text-slate-600">{loading ? 'Cargando…' : data ? (data.canEdit ? 'Edición habilitada' : 'Solo lectura') : 'Sin conexión'}</span></header>
     <div className="flex flex-wrap items-end justify-between gap-4 rounded-xl border bg-white p-4 shadow-sm"><div className="flex gap-4">
@@ -223,7 +260,7 @@ export function IncomeStatementView() {
           const groups = data.groups.filter(g => g.section_id === section.id);
           const ids = new Set(groups.map(g => g.id));
           const accounts = data.accounts.filter(a => ids.has(a.group_id));
-          return <Fragment key={section.id}><tr className={tones[section.code] || 'bg-blue-50'}><th className={cn(firstCell, 'font-bold uppercase tracking-wider', tones[section.code] || 'bg-blue-50')}><span className="flex items-center justify-between gap-2">{editableName('sections', section)}</span></th>{cells([])}</tr>{groups.filter(g => !g.parent_id).map(g => renderGroup(g))}
+          return <Fragment key={section.id}><tr className={tones[section.code] || 'bg-blue-50'}><th className={cn(firstCell, 'font-bold uppercase tracking-wider', tones[section.code] || 'bg-blue-50')}><span className="group/section flex items-center justify-between gap-2">{editableName('sections', section)}{data.canEdit && <button type="button" disabled={Boolean(renaming) || moving} aria-label={`Agregar grupo en ${section.name}`} title={`Agregar grupo en ${section.name}`} className="rounded p-1 opacity-0 transition-opacity hover:bg-white/70 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 group-hover/section:opacity-100 disabled:opacity-0" onClick={() => { setNewSection(section); setName(''); setFormError(''); }}><Plus className="h-5 w-5" /></button>}</span></th>{cells([])}</tr>{groups.filter(g => !g.parent_id).map(g => renderGroup(g))}
             {!groups.length && <tr><td colSpan={14} className="px-5 py-4 text-xs text-slate-400">Catálogo pendiente de cargar.</td></tr>}
             <tr className="bg-[#193D6B] text-white"><th className={cn(firstCell, 'bg-[#193D6B]')}>Total {section.name.toLowerCase()}</th>{cells(accounts)}</tr>
             {section.code === 'EGRESOS' && <tr className="bg-[#0B1B3B] text-white"><th className={cn(firstCell, 'bg-[#0B1B3B]')}>Resultado operativo</th>{results.map((value, i) => <td key={i} title={value === null ? 'Completa los ingresos y egresos del mes, incluyendo los ceros.' : undefined} className="border-b border-l border-slate-700 px-3 text-right text-xs">{renderAmount(value)}</td>)}<td className="border-l border-slate-700 px-3 text-right text-xs">{renderAmount(results.every(v => v !== null) ? sumAmounts(results as string[]) : null)}</td></tr>}
@@ -231,11 +268,13 @@ export function IncomeStatementView() {
         })}
       </tbody></table></div><p className="border-t px-5 py-3 text-xs leading-relaxed text-slate-500">{data.canEdit ? 'Haz clic en una celda para cargar un importe y pulsa Guardar. Haz clic en un nombre para editarlo y pulsa Enter para guardar; Escape cancela. Usa + para agregar una cuenta.' : 'Consulta disponible. La edición requiere que tu correo esté habilitado por el administrador.'} Los totales suman únicamente valores cargados; un mes vacío no equivale a cero. USD y BOB se cargan por separado. El resultado operativo se muestra cuando todas las cuentas de ingresos y egresos del mes tienen un importe, incluyendo los ceros.</p>
     </section>}
-    {(editing || newGroup) && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"><form role="dialog" aria-modal="true" aria-labelledby="pl-edit-title" className="w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-xl" onSubmit={e => { e.preventDefault(); void save(); }} onKeyDown={e => { if (e.key === 'Escape' && !saving) { setEditing(null); setNewGroup(null); setRenaming(null); } if (e.key === 'Tab') { const nodes = e.currentTarget.querySelectorAll<HTMLElement>('input,button:not(:disabled)'); const first = nodes[0], last = nodes[nodes.length - 1]; if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); } } }}>
-      <h2 id="pl-edit-title" className="text-lg font-semibold">{editing ? 'Editar importe' : renaming ? 'Editar nombre' : 'Agregar cuenta'}</h2><p className="text-sm text-slate-500">{editing ? `${editing.account.name} · ${months[editing.month - 1]} ${year} · ${currency}` : renaming?.name || newGroup?.name}</p>
+    {(editing || newGroup || newSection) && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"><form role="dialog" aria-modal="true" aria-labelledby="pl-edit-title" className="w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-xl" onSubmit={e => { e.preventDefault(); void save(); }} onKeyDown={e => { if (e.key === 'Escape' && !saving) { setEditing(null); setNewGroup(null); setNewSection(null); setRenaming(null); } if (e.key === 'Tab') { const nodes = e.currentTarget.querySelectorAll<HTMLElement>('input,button:not(:disabled)'); const first = nodes[0], last = nodes[nodes.length - 1]; if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); } } }}>
+      <h2 id="pl-edit-title" className="text-lg font-semibold">{editing ? 'Editar importe' : newSection ? 'Agregar grupo' : renaming ? 'Editar nombre' : 'Agregar cuenta'}</h2><p className="text-sm text-slate-500">{editing ? `${editing.account.name} · ${months[editing.month - 1]} ${year} · ${currency}` : newSection ? `Dentro de ${newSection.name}` : renaming?.name || newGroup?.name}</p>
       <label className="block text-sm">{editing ? 'Importe' : 'Nombre'}<input autoFocus disabled={saving} className="mt-2 w-full rounded-lg border px-3 py-2" inputMode={editing ? 'decimal' : 'text'} value={editing ? draft : name} maxLength={editing ? 23 : 200} required={!editing} onChange={e => editing ? setDraft(e.target.value) : setName(e.target.value)} /></label>
       {editing && <p className="text-xs text-slate-500">Sin separadores de miles. Ejemplo: 38377,50. Deja vacío para quitar el importe de este mes.</p>}
-      {formError && <p role="alert" className="text-sm text-rose-700">{formError}</p>}<div className="flex justify-end gap-2"><button type="button" className={button} disabled={saving} onClick={() => { setEditing(null); setNewGroup(null); setRenaming(null); }}>Cancelar</button><button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button></div>
+      {formError && <p role="alert" className="text-sm text-rose-700">{formError}</p>}<div className="flex justify-end gap-2"><button type="button" className={button} disabled={saving} onClick={() => { setEditing(null); setNewGroup(null); setNewSection(null); setRenaming(null); }}>Cancelar</button><button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button></div>
     </form></div>}
+    {removalConfirmation && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4"><div role="alertdialog" aria-modal="true" aria-labelledby="remove-title" aria-describedby="remove-description" className="w-full max-w-md space-y-5 rounded-xl bg-white p-6 shadow-xl"><div className="flex items-start gap-3"><div className="rounded-full bg-amber-100 p-2 text-amber-700"><AlertTriangle className="h-5 w-5" /></div><div><h2 id="remove-title" className="text-lg font-semibold text-slate-900">{removalConfirmation.hasValues ? '¿Archivar esta cuenta?' : '¿Eliminar esta fila?'}</h2><p id="remove-description" className="mt-1 text-sm leading-relaxed text-slate-600">{removalConfirmation.hasValues ? <>La cuenta <strong className="font-semibold text-slate-900">«{removalConfirmation.name}»</strong> tiene importes guardados. Se conservarán en los informes históricos, pero la cuenta no podrá recibir nuevas cargas.</> : <>La fila <strong className="font-semibold text-slate-900">«{removalConfirmation.name}»</strong> no tiene importes guardados en ningún año ni moneda. Esta acción no se puede deshacer.</>}</p></div></div><div className="flex justify-end gap-2"><button type="button" className={button} disabled={saving} onClick={() => setRemovalConfirmation(null)}>Cancelar</button><button type="button" className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50" disabled={saving} onClick={() => void confirmAccountRemoval()}>{saving ? 'Procesando…' : removalConfirmation.hasValues ? 'Sí, archivar' : 'Sí, eliminar'}</button></div></div></div>}
+    {groupRemovalConfirmation && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4"><div role="alertdialog" aria-modal="true" aria-labelledby="remove-group-title" aria-describedby="remove-group-description" className="w-full max-w-md space-y-5 rounded-xl bg-white p-6 shadow-xl"><div className="flex items-start gap-3"><div className="rounded-full bg-amber-100 p-2 text-amber-700"><AlertTriangle className="h-5 w-5" /></div><div><h2 id="remove-group-title" className="text-lg font-semibold text-slate-900">{groupRemovalConfirmation.canDelete ? '¿Eliminar este grupo?' : 'No se puede eliminar este grupo'}</h2><p id="remove-group-description" className="mt-1 text-sm leading-relaxed text-slate-600">{groupRemovalConfirmation.canDelete ? <>El grupo <strong className="font-semibold text-slate-900">«{groupRemovalConfirmation.name}»</strong> y sus {groupRemovalConfirmation.accountCount} cuenta{groupRemovalConfirmation.accountCount === 1 ? '' : 's'} sin importes guardados serán eliminados. Esta acción no se puede deshacer.</> : <>El grupo <strong className="font-semibold text-slate-900">«{groupRemovalConfirmation.name}»</strong> contiene {groupRemovalConfirmation.hasValues ? 'importes históricos' : 'subgrupos'}. Elimina primero sus cuentas o subgrupos para proteger la información.</>}</p></div></div><div className="flex justify-end gap-2"><button type="button" className={button} disabled={saving} onClick={() => setGroupRemovalConfirmation(null)}>Cerrar</button>{groupRemovalConfirmation.canDelete && <button type="button" className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50" disabled={saving} onClick={() => void confirmGroupRemoval()}>{saving ? 'Eliminando…' : 'Sí, eliminar'}</button>}</div></div></div>}
   </div>;
 }
