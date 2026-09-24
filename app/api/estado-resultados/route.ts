@@ -96,7 +96,14 @@ export async function POST(request: Request) {
       if (typeof body.sectionId !== 'string' || !uuid.test(body.sectionId) || typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 200) return error('Sección o nombre inválidos.');
       const sections = await plRequest<Array<{ id: string }>>('pl_sections', `select=id&id=eq.${body.sectionId}`);
       if (!sections.length) return error('La sección no existe.', 404);
-      const rows = await plRequest<PLGroup[]>('pl_groups', '', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ section_id: body.sectionId, parent_id: null, name: body.name.trim(), code: `WEB_${crypto.randomUUID()}`, sort_order: 10000 }) });
+      let parentId: string | null = null;
+      if (body.parentId !== undefined) {
+        if (typeof body.parentId !== 'string' || !uuid.test(body.parentId)) return error('Grupo padre inválido.');
+        const parents = await plRequest<PLGroup[]>('pl_groups', `select=id,section_id&id=eq.${body.parentId}`);
+        if (!parents.length || parents[0].section_id !== body.sectionId) return error('El grupo padre no pertenece a la sección.', 409);
+        parentId = body.parentId;
+      }
+      const rows = await plRequest<PLGroup[]>('pl_groups', '', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ section_id: body.sectionId, parent_id: parentId, name: body.name.trim(), code: `WEB_${crypto.randomUUID()}`, sort_order: 10000 }) });
       return NextResponse.json({ group: rows[0] });
     }
     if (body.action === 'account') {
