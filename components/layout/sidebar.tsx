@@ -51,7 +51,7 @@ export function Sidebar({ onHide }: { onHide: () => void }) {
             />
           </div>
           <div className="min-w-0 leading-tight">
-            <div className="text-sm font-semibold text-white">Xtendo 9.0</div>
+            <div className="text-sm font-semibold text-white">Xtendo 5.0</div>
             <div className="text-[11px] uppercase tracking-wider text-slate-400">
               Flujo de Caja
             </div>
