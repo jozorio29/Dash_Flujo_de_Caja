@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DashboardData, Movement, ProjectedDashboardData, ProjectedMovement } from "@/lib/types";
+import {
+  DashboardData,
+  Movement,
+  ProjectedDashboardData,
+  ProjectedMovement,
+} from "@/lib/types";
 import { buildDashboard } from "@/lib/aggregations";
 import { parseApiDate } from "@/lib/utils";
 import { DashboardFilters, DashboardHeader } from "./header";
@@ -57,7 +62,9 @@ export function DashboardView() {
     to: "",
     moneda: "BOB",
   });
-  const [selectedExpenseCategory, setSelectedExpenseCategory] = useState<string | null>(null);
+  const [selectedExpenseCategory, setSelectedExpenseCategory] = useState<
+    string | null
+  >(null);
   const filtersInitializedRef = useRef(false);
 
   useEffect(() => {
@@ -134,7 +141,10 @@ export function DashboardView() {
     const { from, to } = previousPeriod(curFrom, curTo);
 
     const prevMovs = allMovements.filter(
-      (m) => m.fecha && m.fecha.getTime() >= from.getTime() && m.fecha.getTime() <= to.getTime()
+      (m) =>
+        m.fecha &&
+        m.fecha.getTime() >= from.getTime() &&
+        m.fecha.getTime() <= to.getTime(),
     );
     if (prevMovs.length === 0) return null;
 
@@ -152,7 +162,7 @@ export function DashboardView() {
       }
     }
     const last = prevMovs[prevMovs.length - 1];
-    const saldoAcumulado = isUsd ? last?.saldoUsd ?? 0 : last?.saldo ?? 0;
+    const saldoAcumulado = isUsd ? (last?.saldoUsd ?? 0) : (last?.saldo ?? 0);
 
     return { ingresos, egresos, saldoAcumulado };
   }, [allMovements, filters]);
@@ -173,7 +183,9 @@ export function DashboardView() {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const totalPendiente = allProjected
-      .filter((p) => p.fecha && p.fecha.getTime() >= now.getTime() && p.egresos > 0)
+      .filter(
+        (p) => p.fecha && p.fecha.getTime() >= now.getTime() && p.egresos > 0,
+      )
       .reduce((s, p) => s + (isUsd ? p.debitoUsd : p.egresos), 0);
     const saldoDisponible = saldoAcumulado - totalPendiente;
 
@@ -198,7 +210,7 @@ export function DashboardView() {
       .sort((a, b) => a.getTime() - b.getTime());
     const fmt = (d: Date) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-        d.getDate()
+        d.getDate(),
       ).padStart(2, "0")}`;
     return {
       minDate: dates[0] ? fmt(dates[0]) : null,
@@ -231,11 +243,15 @@ export function DashboardView() {
 
   const isEmpty = filtered.movements.length === 0;
   const selectedCategory =
-    filtered.categories.find((category) => category.categoria === selectedExpenseCategory) ?? null;
+    filtered.categories.find(
+      (category) => category.categoria === selectedExpenseCategory,
+    ) ?? null;
 
   // Saldo inicial del rango (para el área chart de tendencia)
   const saldoInicial =
-    filters.moneda === "USD" ? filtered.kpis.saldoInicialUsd : filtered.kpis.saldoInicial;
+    filters.moneda === "USD"
+      ? filtered.kpis.saldoInicialUsd
+      : filtered.kpis.saldoInicial;
 
   return (
     <div className="space-y-3 p-4 lg:px-6 lg:py-4">
@@ -246,28 +262,34 @@ export function DashboardView() {
         maxDate={maxDate}
         filteredCount={filtered.movements.length}
       />
-
-      <p className="-mt-2 max-w-3xl text-sm text-slate-500">
-        Visualiza tus ingresos, egresos y saldo disponible en tiempo real para tomar mejores
-        decisiones financieras.
-      </p>
-
       {isEmpty ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center text-amber-900">
-          <p className="font-semibold">Sin movimientos en el período seleccionado</p>
-          <p className="mt-1 text-sm">Ajusta el rango de fechas para ver datos.</p>
+          <p className="font-semibold">
+            Sin movimientos en el período seleccionado
+          </p>
+          <p className="mt-1 text-sm">
+            Ajusta el rango de fechas para ver datos.
+          </p>
         </div>
       ) : (
         <>
           {/* ── ROW 1: 4 KPI cards ── */}
           <KpiCardsV2 kpis={kpisV2} moneda={filters.moneda} />
 
-          <CashSummaryPanels real={allMovements || []} planned={allProjected} currency={filters.moneda} forecastUnavailable={forecastUnavailable} />
+          <CashSummaryPanels
+            real={allMovements || []}
+            planned={allProjected}
+            currency={filters.moneda}
+            forecastUnavailable={forecastUnavailable}
+          />
 
           {/* ── ROW 2: Flujo Mensual (2/3) + Donut Gastos (1/3) ── */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <MonthlyFlowsChart data={filtered.monthlyFlows} moneda={filters.moneda} />
+              <MonthlyFlowsChart
+                data={filtered.monthlyFlows}
+                moneda={filters.moneda}
+              />
             </div>
             <div className="lg:col-span-1">
               <ExpenseDonut
@@ -281,7 +303,10 @@ export function DashboardView() {
 
           {/* ── ROW 3: Comparativo + Tendencia ── */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <IngresosEgresosBars data={filtered.monthlyFlows} moneda={filters.moneda} />
+            <IngresosEgresosBars
+              data={filtered.monthlyFlows}
+              moneda={filters.moneda}
+            />
             <SaldoTrendArea
               monthlyFlows={filtered.monthlyFlows}
               saldoInicial={saldoInicial}

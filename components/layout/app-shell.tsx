@@ -50,9 +50,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
       ) : null}
       <main className={cn("flex-1 overflow-x-auto", !sidebarOpen && "md:pt-10")}>
-        <div className="flex justify-end px-4 pt-2"><ThemeToggle /></div>
         {children}
       </main>
+      <div className="fixed bottom-4 right-4 z-40">
+        <ThemeToggle />
+      </div>
     </div>
   );
 }
