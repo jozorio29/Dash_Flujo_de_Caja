@@ -69,16 +69,17 @@ export function Sidebar({ onHide }: { onHide: () => void }) {
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-800/40 bg-[#0B1B3B] text-slate-200 md:flex">
       <div className="flex h-24 items-center justify-between gap-3 px-5 pt-2">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#f2f2f2] shadow-lg shadow-blue-900/40">
+        <div className="min-w-0 flex-1">
+          <div className="w-full">
             <img
-              src="/xtendo-logo.svg"
+              src="/xtendo-logo-dark.png"
               alt="Xtendo"
-              className="h-full w-full object-contain"
+              width={3133}
+              height={976}
+              className="h-auto w-full object-contain"
             />
           </div>
-          <div className="min-w-0 leading-tight">
-            <div className="text-sm font-semibold text-white">Xtendo 5.0</div>
+          <div className="mt-2 leading-tight">
             <div className="text-[11px] uppercase tracking-wider text-slate-400">
               Flujo de Caja
             </div>

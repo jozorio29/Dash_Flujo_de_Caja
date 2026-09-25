@@ -14,9 +14,9 @@ export const metadata: Metadata = {
   description:
     "Dashboard de análisis financiero - Ingresos, egresos y flujo de caja",
   icons: {
-    icon: "/xtendo-favicon.png",
-    shortcut: "/xtendo-favicon.png",
-    apple: "/xtendo-favicon.png",
+    icon: "/xtendo-icon.png",
+    shortcut: "/xtendo-icon.png",
+    apple: "/xtendo-icon.png",
   },
 };
 
