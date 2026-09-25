@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -16,6 +17,8 @@ import {
   FileSpreadsheet,
   LogOut,
   PanelLeftClose,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +41,30 @@ const NAV = [
 export function Sidebar({ onHide }: { onHide: () => void }) {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "dark" || (!savedTheme && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+      setTheme("dark");
+      document.documentElement.classList.add("dark");
+    } else {
+      setTheme("light");
+      document.documentElement.classList.remove("dark");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    if (theme === "light") {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+      setTheme("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+      setTheme("light");
+    }
+  };
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-800/40 bg-[#0B1B3B] text-slate-200 md:flex">
@@ -65,6 +92,16 @@ export function Sidebar({ onHide }: { onHide: () => void }) {
           title="Ocultar menú lateral"
         >
           <PanelLeftClose className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="px-3 pb-2">
+        <button
+          onClick={toggleTheme}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10"
+        >
+          {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          {theme === "dark" ? "Modo Claro" : "Modo Oscuro"}
         </button>
       </div>
 
@@ -111,7 +148,7 @@ export function Sidebar({ onHide }: { onHide: () => void }) {
         )}
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-rose-500/20 hover:text-rose-200"
         >
           <LogOut className="h-3.5 w-3.5" />
           Cerrar sesión

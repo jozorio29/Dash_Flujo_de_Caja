@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, AlertTriangle, Coins, Calendar, Filter } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { cn } from "@/lib/utils";
 
 interface FacturacionRow {
@@ -48,6 +48,41 @@ const CustomTooltip = ({ active, payload, label, moneda }: any) => {
     );
   }
   return null;
+};
+
+const PieTooltip = ({ active, payload, moneda }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: data.color }}></div>
+          <p className="font-bold text-slate-800">{data.name}</p>
+        </div>
+        <div className="flex justify-between gap-4 text-sm">
+          <span className="font-medium text-slate-600">
+            {new Intl.NumberFormat("es-BO", { style: "currency", currency: moneda }).format(data.value)}
+          </span>
+          <span className="font-bold text-slate-800">
+            {data.percentage ? `${data.percentage.toFixed(1)}%` : ""}
+          </span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
+  const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+
+  return percent > 0.04 ? (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  ) : null;
 };
 
 const COLUMNS = [
@@ -137,6 +172,40 @@ export function FacturacionView() {
     });
   }, [data, dateStart, dateEnd, moneda]);
 
+  const pieDataGlobal = useMemo(() => {
+    const totals: Record<string, number> = {};
+    let grandTotal = 0;
+    COLUMNS.forEach(c => totals[c.key] = 0);
+    filteredAndConvertedData.forEach(row => {
+      COLUMNS.forEach(c => {
+        if (visibleColumns[c.key]) {
+          totals[c.key] += (row[c.key] || 0);
+        }
+      });
+    });
+    const result = COLUMNS.filter(c => visibleColumns[c.key] && totals[c.key] > 0).map(c => {
+      grandTotal += totals[c.key];
+      return {
+        name: c.label,
+        value: totals[c.key],
+        color: c.color
+      };
+    });
+    return result.map(d => ({ ...d, percentage: grandTotal > 0 ? (d.value / grandTotal) * 100 : 0 }));
+  }, [filteredAndConvertedData, visibleColumns]);
+
+  const pieDataServicios = useMemo(() => {
+    const filtered = pieDataGlobal.filter(d => COLUMNS_SERVICIOS.some(c => c.label === d.name));
+    const total = filtered.reduce((acc, curr) => acc + curr.value, 0);
+    return filtered.map(d => ({ ...d, percentage: total > 0 ? (d.value / total) * 100 : 0 }));
+  }, [pieDataGlobal]);
+
+  const pieDataAlquileres = useMemo(() => {
+    const filtered = pieDataGlobal.filter(d => COLUMNS_ALQUILERES.some(c => c.label === d.name));
+    const total = filtered.reduce((acc, curr) => acc + curr.value, 0);
+    return filtered.map(d => ({ ...d, percentage: total > 0 ? (d.value / total) * 100 : 0 }));
+  }, [pieDataGlobal]);
+
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -177,7 +246,7 @@ export function FacturacionView() {
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end flex-wrap">
           {/* Fecha Inicio */}
-          <div className="h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="flex items-center gap-1.5">
               <Calendar className="h-3 w-3 text-slate-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
@@ -189,15 +258,15 @@ export function FacturacionView() {
               onChange={(e) => setDateStart(e.target.value)}
               className="mt-0.5 cursor-pointer bg-transparent text-sm font-semibold tabular-nums text-slate-800 outline-none"
             >
-              <option value="ALL">Todo</option>
+              <option value="ALL" style={{ color: "black", backgroundColor: "white" }}>Todo</option>
               {availableDates.map(d => (
-                <option key={d.value} value={d.value}>{d.label}</option>
+                <option key={d.value} value={d.value} style={{ color: "black", backgroundColor: "white" }}>{d.label}</option>
               ))}
             </select>
           </div>
 
           {/* Fecha Fin */}
-          <div className="h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="flex items-center gap-1.5">
               <Calendar className="h-3 w-3 text-slate-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
@@ -209,15 +278,15 @@ export function FacturacionView() {
               onChange={(e) => setDateEnd(e.target.value)}
               className="mt-0.5 cursor-pointer bg-transparent text-sm font-semibold tabular-nums text-slate-800 outline-none"
             >
-              <option value="ALL">Todo</option>
+              <option value="ALL" style={{ color: "black", backgroundColor: "white" }}>Todo</option>
               {availableDates.map(d => (
-                <option key={d.value} value={d.value}>{d.label}</option>
+                <option key={d.value} value={d.value} style={{ color: "black", backgroundColor: "white" }}>{d.label}</option>
               ))}
             </select>
           </div>
 
           {/* Moneda */}
-          <div className="h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="flex items-center gap-1.5">
               <Coins className="h-3 w-3 text-slate-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
@@ -344,6 +413,54 @@ export function FacturacionView() {
                   <Line key={c.key} type="monotone" dataKey={c.key} name={c.label} stroke={c.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                 ))}
               </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Gráficos de Pastel (Distribución) */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        {/* Pastel 1: General */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-bold text-slate-800 text-center">Distribución General</h2>
+          <div className="h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieDataGlobal} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} labelLine={false} label={renderCustomizedLabel}>
+                  {pieDataGlobal.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                </Pie>
+                <Tooltip content={<PieTooltip moneda={moneda} />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Pastel 2: Servicios */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-bold text-slate-800 text-center">Distribución Servicios</h2>
+          <div className="h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieDataServicios} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} labelLine={false} label={renderCustomizedLabel}>
+                  {pieDataServicios.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                </Pie>
+                <Tooltip content={<PieTooltip moneda={moneda} />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Pastel 3: Alquileres */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-bold text-slate-800 text-center">Distribución Alquileres</h2>
+          <div className="h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieDataAlquileres} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} labelLine={false} label={renderCustomizedLabel}>
+                  {pieDataAlquileres.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                </Pie>
+                <Tooltip content={<PieTooltip moneda={moneda} />} />
+              </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
