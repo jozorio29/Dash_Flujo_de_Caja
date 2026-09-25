@@ -24,6 +24,32 @@ interface FacturacionRow {
 
 type Moneda = "USD" | "BOB";
 
+const CustomTooltip = ({ active, payload, label, moneda }: any) => {
+  if (active && payload && payload.length) {
+    const total = payload.reduce((sum: number, entry: any) => sum + entry.value, 0);
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+        <p className="mb-2 font-bold text-slate-800">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex justify-between gap-4 text-sm mb-1" style={{ color: entry.color }}>
+            <span>{entry.name}:</span>
+            <span className="font-medium">
+              {new Intl.NumberFormat("es-BO", { style: "currency", currency: moneda }).format(entry.value)}
+            </span>
+          </div>
+        ))}
+        <div className="mt-2 border-t pt-2 flex justify-between gap-4 text-sm font-bold text-slate-800">
+          <span>Total:</span>
+          <span>
+            {new Intl.NumberFormat("es-BO", { style: "currency", currency: moneda }).format(total)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 const COLUMNS = [
   { key: "tigoBolivia", label: "TIGO Bolivia (e-care)", color: "#2563eb" }, // blue-600
   { key: "tigoUruguayCC", label: "TIGO Uruguay (Call center)", color: "#16a34a" }, // green-600
@@ -46,7 +72,8 @@ export function FacturacionView() {
   const [error, setError] = useState<string | null>(null);
   
   const [moneda, setMoneda] = useState<Moneda>("USD");
-  const [yearSelected, setYearSelected] = useState<number | "ALL">("ALL");
+  const [dateStart, setDateStart] = useState<string>("ALL");
+  const [dateEnd, setDateEnd] = useState<string>("ALL");
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
     Object.fromEntries(COLUMNS.map(c => [c.key, true]))
   );
@@ -72,20 +99,29 @@ export function FacturacionView() {
     return () => { cancelled = true; };
   }, []);
 
-  const availableYears = useMemo(() => {
+  const availableDates = useMemo(() => {
     if (!data) return [];
-    const ys = new Set<number>();
-    data.forEach(d => ys.add(d.ano));
-    return Array.from(ys).sort();
+    const ds = new Map<string, string>();
+    data.forEach(d => {
+      const val = d.fecha.substring(0, 7); // YYYY-MM
+      const label = `${d.mes.substring(0,3)} ${d.ano}`;
+      if (!ds.has(val)) ds.set(val, label);
+    });
+    return Array.from(ds.entries()).map(([value, label]) => ({ value, label })).sort((a, b) => a.value.localeCompare(b.value));
   }, [data]);
 
   const filteredAndConvertedData = useMemo(() => {
     if (!data) return [];
     
-    // Filtro por año
+    // Filtro por fechas
     let filtered = data;
-    if (yearSelected !== "ALL") {
-      filtered = data.filter(d => d.ano === yearSelected);
+    if (dateStart !== "ALL" || dateEnd !== "ALL") {
+      filtered = data.filter(d => {
+        const dVal = d.fecha.substring(0, 7);
+        const passStart = dateStart === "ALL" || dVal >= dateStart;
+        const passEnd = dateEnd === "ALL" || dVal <= dateEnd;
+        return passStart && passEnd;
+      });
     }
     
     // Conversión de moneda
@@ -139,23 +175,43 @@ export function FacturacionView() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          {/* Año */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end flex-wrap">
+          {/* Fecha Inicio */}
           <div className="h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
             <div className="flex items-center gap-1.5">
               <Calendar className="h-3 w-3 text-slate-500" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                Año
+                Desde
               </span>
             </div>
             <select
-              value={yearSelected}
-              onChange={(e) => setYearSelected(e.target.value === "ALL" ? "ALL" : parseInt(e.target.value, 10))}
+              value={dateStart}
+              onChange={(e) => setDateStart(e.target.value)}
               className="mt-0.5 cursor-pointer bg-transparent text-sm font-semibold tabular-nums text-slate-800 outline-none"
             >
-              <option value="ALL">Todos los años</option>
-              {availableYears.map(y => (
-                <option key={y} value={y}>{y}</option>
+              <option value="ALL">Todo</option>
+              {availableDates.map(d => (
+                <option key={d.value} value={d.value}>{d.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Fecha Fin */}
+          <div className="h-20 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-3 w-3 text-slate-500" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Hasta
+              </span>
+            </div>
+            <select
+              value={dateEnd}
+              onChange={(e) => setDateEnd(e.target.value)}
+              className="mt-0.5 cursor-pointer bg-transparent text-sm font-semibold tabular-nums text-slate-800 outline-none"
+            >
+              <option value="ALL">Todo</option>
+              {availableDates.map(d => (
+                <option key={d.value} value={d.value}>{d.label}</option>
               ))}
             </select>
           </div>
@@ -233,11 +289,7 @@ export function FacturacionView() {
                 tickLine={false} 
                 tickFormatter={(val) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(val)}
               />
-              <Tooltip 
-                formatter={(value: number) => new Intl.NumberFormat("es-BO", { style: "currency", currency: moneda }).format(value)}
-                labelStyle={{ fontWeight: "bold", color: "#1e293b", marginBottom: "8px" }}
-                contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
-              />
+              <Tooltip content={<CustomTooltip moneda={moneda} />} />
               <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "20px" }} />
               {COLUMNS.map(c => visibleColumns[c.key] && (
                 <Line key={c.key} type="monotone" dataKey={c.key} name={c.label} stroke={c.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
@@ -262,12 +314,10 @@ export function FacturacionView() {
                   tickLine={false} 
                   tickFormatter={(val) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(val)}
                 />
-                <Tooltip 
-                  formatter={(value: number) => new Intl.NumberFormat("es-BO", { style: "currency", currency: moneda }).format(value)}
-                />
+                <Tooltip content={<CustomTooltip moneda={moneda} />} />
                 <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "20px" }} />
-                {COLUMNS_SERVICIOS.map(c => (
-                  <Line key={c.key} type="monotone" dataKey={c.key} name={c.label} stroke={c.color} strokeWidth={2} dot={{ r: 3 }} />
+                {COLUMNS_SERVICIOS.map(c => visibleColumns[c.key] && (
+                  <Line key={c.key} type="monotone" dataKey={c.key} name={c.label} stroke={c.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                 ))}
               </LineChart>
             </ResponsiveContainer>
@@ -288,12 +338,10 @@ export function FacturacionView() {
                   tickLine={false} 
                   tickFormatter={(val) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(val)}
                 />
-                <Tooltip 
-                  formatter={(value: number) => new Intl.NumberFormat("es-BO", { style: "currency", currency: moneda }).format(value)}
-                />
+                <Tooltip content={<CustomTooltip moneda={moneda} />} />
                 <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "20px" }} />
-                {COLUMNS_ALQUILERES.map(c => (
-                  <Line key={c.key} type="monotone" dataKey={c.key} name={c.label} stroke={c.color} strokeWidth={2} dot={{ r: 3 }} />
+                {COLUMNS_ALQUILERES.map(c => visibleColumns[c.key] && (
+                  <Line key={c.key} type="monotone" dataKey={c.key} name={c.label} stroke={c.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                 ))}
               </LineChart>
             </ResponsiveContainer>
