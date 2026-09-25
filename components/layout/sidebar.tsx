@@ -11,7 +11,7 @@ import {
   Tags,
   CalendarRange,
   ListChecks,
-  CalendarDays,
+  UserCircle,
   TableProperties,
   Sheet,
   FileSpreadsheet,
@@ -30,7 +30,11 @@ const NAV = [
     label: "Flujo de Caja Proyectado",
     icon: TableProperties,
   },
-  { href: "/estado-resultados", label: "Estado de Resultados", icon: FileSpreadsheet },
+  {
+    href: "/estado-resultados",
+    label: "Estado de Resultados",
+    icon: FileSpreadsheet,
+  },
   { href: "/facturacion", label: "Facturación", icon: TrendingUp },
   { href: "/egresos", label: "Egresos", icon: TrendingDown },
   { href: "/categorias", label: "Categorías", icon: Tags },
@@ -41,34 +45,42 @@ const NAV = [
 export function Sidebar({ onHide }: { onHide: () => void }) {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const [failedImage, setFailedImage] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark" || (!savedTheme && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+    if (
+      savedTheme === "dark" ||
+      (!savedTheme && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    ) {
       setTheme("dark");
       document.documentElement.classList.add("dark");
+      document.documentElement.style.colorScheme = "dark";
     } else {
       setTheme("light");
       document.documentElement.classList.remove("dark");
+      document.documentElement.style.colorScheme = "light";
     }
   }, []);
 
   const toggleTheme = () => {
     if (theme === "light") {
       document.documentElement.classList.add("dark");
+      document.documentElement.style.colorScheme = "dark";
       localStorage.setItem("theme", "dark");
       setTheme("dark");
     } else {
       document.documentElement.classList.remove("dark");
+      document.documentElement.style.colorScheme = "light";
       localStorage.setItem("theme", "light");
       setTheme("light");
     }
   };
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-800/40 bg-[#0B1B3B] text-slate-200 md:flex">
-      <div className="flex h-24 items-center justify-between gap-3 px-5 pt-2">
+    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col overflow-hidden border-r border-slate-800/40 bg-[#0B1B3B] text-slate-200 md:flex">
+      <div className="flex h-24 shrink-0 items-center justify-between gap-3 px-5 pt-2">
         <div className="min-w-0 flex-1">
           <div className="w-full">
             <img
@@ -78,11 +90,6 @@ export function Sidebar({ onHide }: { onHide: () => void }) {
               height={976}
               className="h-auto w-full object-contain"
             />
-          </div>
-          <div className="mt-2 leading-tight">
-            <div className="text-[11px] uppercase tracking-wider text-slate-400">
-              Flujo de Caja
-            </div>
           </div>
         </div>
         <button
@@ -96,17 +103,7 @@ export function Sidebar({ onHide }: { onHide: () => void }) {
         </button>
       </div>
 
-      <div className="px-3 pb-2">
-        <button
-          onClick={toggleTheme}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10"
-        >
-          {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-          {theme === "dark" ? "Modo Claro" : "Modo Oscuro"}
-        </button>
-      </div>
-
-      <nav className="flex-1 space-y-1 px-3 py-2">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-2">
         {NAV.map((item) => {
           const active = pathname === item.href;
           const Icon = item.icon;
@@ -135,18 +132,45 @@ export function Sidebar({ onHide }: { onHide: () => void }) {
         })}
       </nav>
 
-      <div className="m-3 rounded-xl bg-slate-900/40 p-3 text-xs ring-1 ring-white/5">
+      <div className="m-3 shrink-0 rounded-xl bg-slate-900/40 p-3 text-xs ring-1 ring-white/5">
         {session?.user && (
-          <>
-            <div className="mb-2 flex items-center gap-2 text-slate-400">
-              <CalendarDays className="h-3.5 w-3.5" />
-              <span className="uppercase tracking-wider">Sesión</span>
+            <div
+              className="mb-3 flex items-center gap-2 text-sm font-semibold text-white"
+              title={session.user.email ?? ""}
+            >
+              {session.user.image && failedImage !== session.user.image ? (
+                <img
+                  src={session.user.image}
+                  alt="Foto de perfil"
+                  width={32}
+                  height={32}
+                  referrerPolicy="no-referrer"
+                  onError={() => setFailedImage(session?.user?.image ?? null)}
+                  className="h-8 w-8 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <UserCircle className="h-8 w-8 shrink-0 text-slate-400" aria-hidden="true" />
+              )}
+              <div className="min-w-0">
+                <div className="text-[11px] font-normal text-slate-400">Usuario</div>
+                <div className="truncate">
+                  {session.user.name?.split("@")[0].trim() || "Usuario"}
+                </div>
+              </div>
             </div>
-            <div className="mb-3 truncate text-sm font-semibold text-white" title={session.user.email ?? ""}>
-              {session.user.name ?? session.user.email}
-            </div>
-          </>
         )}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10"
+        >
+          {theme === "dark" ? (
+            <Sun className="h-3.5 w-3.5" />
+          ) : (
+            <Moon className="h-3.5 w-3.5" />
+          )}
+          {theme === "dark" ? "Modo Claro" : "Modo Oscuro"}
+        </button>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:bg-rose-500/20 hover:text-rose-200"
