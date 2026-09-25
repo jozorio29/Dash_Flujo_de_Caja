@@ -5,6 +5,7 @@ import { DashboardData, Movement, ProjectedDashboardData, ProjectedMovement } fr
 import { buildDashboard } from "@/lib/aggregations";
 import { parseApiDate } from "@/lib/utils";
 import { DashboardFilters, DashboardHeader } from "./header";
+import { CashSummaryPanels } from "./cash-summary-panels";
 import { KpiCardsV2 } from "./kpi-cards-v2";
 import { MonthlyFlowsChart } from "./monthly-flows-chart";
 import { ExpenseDonut } from "./expense-donut";
@@ -47,6 +48,7 @@ function previousPeriod(from: Date, to: Date): { from: Date; to: Date } {
 export function DashboardView() {
   const [allMovements, setAllMovements] = useState<Movement[] | null>(null);
   const [allProjected, setAllProjected] = useState<ProjectedMovement[]>([]);
+  const [forecastUnavailable, setForecastUnavailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -84,6 +86,7 @@ export function DashboardView() {
           setAllProjected(rehydrateProjected(jsonProy.movements));
         } else {
           setAllProjected([]);
+          setForecastUnavailable(true);
         }
 
         if (!filtersInitializedRef.current) {
@@ -235,7 +238,7 @@ export function DashboardView() {
     filters.moneda === "USD" ? filtered.kpis.saldoInicialUsd : filtered.kpis.saldoInicial;
 
   return (
-    <div className="space-y-5 p-6 lg:p-8">
+    <div className="space-y-3 p-4 lg:px-6 lg:py-4">
       <DashboardHeader
         filters={filters}
         onFiltersChange={setFilters}
@@ -259,8 +262,10 @@ export function DashboardView() {
           {/* ── ROW 1: 4 KPI cards ── */}
           <KpiCardsV2 kpis={kpisV2} moneda={filters.moneda} />
 
+          <CashSummaryPanels real={allMovements || []} planned={allProjected} currency={filters.moneda} forecastUnavailable={forecastUnavailable} />
+
           {/* ── ROW 2: Flujo Mensual (2/3) + Donut Gastos (1/3) ── */}
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <MonthlyFlowsChart data={filtered.monthlyFlows} moneda={filters.moneda} />
             </div>
@@ -275,7 +280,7 @@ export function DashboardView() {
           </div>
 
           {/* ── ROW 3: Comparativo + Tendencia ── */}
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <IngresosEgresosBars data={filtered.monthlyFlows} moneda={filters.moneda} />
             <SaldoTrendArea
               monthlyFlows={filtered.monthlyFlows}

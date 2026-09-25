@@ -1,8 +1,8 @@
 export interface PLSection { id: string; code: string; name: string; sort_order: number }
 export interface PLGroup { id: string; section_id: string; parent_id: string | null; code: string; name: string; sort_order: number }
 export interface PLAccount { id: string; group_id: string; code: string; name: string; active: boolean; sort_order: number }
-export interface PLValue { id: string; account_id: string; year: number; month: number; currency: string; amount: string; updated_at: string }
-export interface PLData { sections: PLSection[]; groups: PLGroup[]; accounts: PLAccount[]; values: PLValue[]; canEdit: boolean }
+export interface PLValue { id: string; account_id: string; year: number; month: number; currency: string; amount: string; formula?: string | null; formulaError?: string; updated_at: string }
+export interface PLData { sections: PLSection[]; groups: PLGroup[]; accounts: PLAccount[]; values: PLValue[]; canEdit: boolean; formulasEnabled?: boolean }
 
 // Decimal strings preserve all six decimal places supported by numeric(20,6).
 export function normalizeAmount(input: string): string {

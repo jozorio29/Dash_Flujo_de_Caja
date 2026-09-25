@@ -67,10 +67,10 @@ export function ExpenseDonut({
   if (categories.length === 0 || total === 0) {
     return (
       <Card className="h-full">
-        <CardHeader>
+        <CardHeader className="p-4 pb-2">
           <CardTitle>Gastos por Categoría</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4 pt-0">
           <div className="flex h-[260px] items-center justify-center text-sm text-slate-400">
             Sin egresos en el período
           </div>
@@ -81,10 +81,10 @@ export function ExpenseDonut({
 
   return (
     <Card className="h-full">
-      <CardHeader>
+      <CardHeader className="p-4 pb-2">
         <CardTitle>Gastos por Categoría</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 pb-4 pt-0">
         <div className="flex flex-col items-center gap-4 sm:flex-row lg:flex-col xl:flex-row">
           {/* Donut */}
           <div className="relative h-[200px] w-[200px] shrink-0">

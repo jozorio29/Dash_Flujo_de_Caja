@@ -85,7 +85,7 @@ export function FlujoRealTable({ data, moneda, title }: Props) {
 
   /** Render de celda numérica: guion tenue si es 0, color solo para señales. */
   const cell = (v: number, tone: "ingreso" | "egreso" | "neutral" = "neutral", bold = false) => {
-    if (v === 0) return <span className="text-slate-300">{ZERO_MARK}</span>;
+    if (v === 0) return <span className="cf-zero">{ZERO_MARK}</span>;
     const color =
       v < 0
         ? "text-rose-600"
@@ -97,7 +97,7 @@ export function FlujoRealTable({ data, moneda, title }: Props) {
     "border-b border-slate-300 px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500";
   const monthBorderClass = "border-r border-slate-100";
   const totalCellClass =
-    "sticky right-0 z-10 border-l-2 border-slate-300 bg-slate-50 px-3 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]";
+    "sticky right-0 z-10 border-l-2 border-slate-300 cf-muted px-3 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]";
 
   function toggleRow(key: string) {
     setExpandedRows((current) => {
@@ -150,8 +150,8 @@ export function FlujoRealTable({ data, moneda, title }: Props) {
   }
 
   return (
-    <Card className="overflow-hidden border-slate-200 shadow-sm">
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
+    <Card className="cash-flow-table overflow-hidden border-slate-200 shadow-sm">
+      <div className="border-b border-slate-200 cf-surface px-6 py-4">
         <h2 className="text-xl font-semibold tracking-tight text-slate-900">
           {title ?? `Flujo de caja — ${data.year}`}
         </h2>
@@ -160,8 +160,8 @@ export function FlujoRealTable({ data, moneda, title }: Props) {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1180px] border-collapse text-sm">
           <thead>
-            <tr className="bg-slate-50">
-              <th className="sticky left-0 z-20 border-b border-r border-slate-300 bg-slate-50 px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-600 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.45)]">
+            <tr className="cf-muted">
+              <th className="sticky left-0 z-20 border-b border-r border-slate-300 cf-muted px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-600 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.45)]">
                 Concepto
               </th>
               {MESES.map((m, i) => (
@@ -170,13 +170,13 @@ export function FlujoRealTable({ data, moneda, title }: Props) {
                   className={cn(
                     headerCellClass,
                     monthBorderClass,
-                    isFutureMonth(i) && "bg-slate-50/70 text-slate-300",
+                    isFutureMonth(i) && "cf-future cf-zero",
                   )}
                 >
                   {m}
                 </th>
               ))}
-              <th className="sticky right-0 z-20 border-b border-l-2 border-slate-300 bg-slate-100 px-3 py-2 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">
+              <th className="sticky right-0 z-20 border-b border-l-2 border-slate-300 cf-total px-3 py-2 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">
                 Total
               </th>
             </tr>
@@ -184,8 +184,8 @@ export function FlujoRealTable({ data, moneda, title }: Props) {
 
           <tbody>
             {/* ── SALDO INICIAL ── */}
-            <tr className="bg-white hover:bg-slate-50/60">
-              <td className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white px-4 py-2 font-semibold text-slate-800 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.45)]">
+            <tr className="cf-surface cf-hover-row">
+              <td className="sticky left-0 z-10 border-b border-r border-slate-200 cf-surface px-4 py-2 font-semibold text-slate-800 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.45)]">
                 Saldo inicial
               </td>
               {data.saldoInicialPorMes.map((v, i) => (
@@ -194,13 +194,13 @@ export function FlujoRealTable({ data, moneda, title }: Props) {
                   className={cn(
                     "border-b border-slate-100 px-3 py-2 text-right",
                     monthBorderClass,
-                    isFutureMonth(i) && "bg-slate-50/40",
+                    isFutureMonth(i) && "cf-future",
                   )}
                 >
                   {cell(v, "neutral", true)}
                 </td>
               ))}
-              <td className={cn(totalCellClass, "border-b py-2 text-slate-300")}>
+              <td className={cn(totalCellClass, "border-b py-2 cf-zero")}>
                 {ZERO_MARK}
               </td>
             </tr>
@@ -256,8 +256,8 @@ export function FlujoRealTable({ data, moneda, title }: Props) {
             />
 
             {/* ── FLUJO DE CAJA ECONÓMICO (BANDA VERDE) ── */}
-            <tr className="border-y-2 border-slate-300 bg-slate-50 font-semibold">
-              <td className="sticky left-0 z-10 border-r border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.45)]">
+            <tr className="border-y-2 border-slate-300 cf-muted font-semibold">
+              <td className="sticky left-0 z-10 border-r border-slate-300 cf-muted px-4 py-3 text-slate-900 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.45)]">
                 Flujo de caja económico
               </td>
               {data.flujoEconomicoPorMes.map((v, i) => (
@@ -266,7 +266,7 @@ export function FlujoRealTable({ data, moneda, title }: Props) {
                   className={cn(
                     "px-3 py-3 text-right",
                     monthBorderClass,
-                    isFutureMonth(i) && "bg-slate-50/70",
+                    isFutureMonth(i) && "cf-future",
                   )}
                   title={economicFormula(i)}
                 >
@@ -388,9 +388,9 @@ function SectionHeader({
 }) {
   const dot = tone === "ingreso" ? "bg-blue-500" : tone === "egreso" ? "bg-rose-500" : "bg-amber-500";
   return (
-    <tr className="bg-white">
+    <tr className="cf-surface">
       <td
-        className="sticky left-0 z-10 border-y border-r border-slate-200 bg-white px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.45)]"
+        className="sticky left-0 z-10 border-y border-r border-slate-200 cf-surface px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.45)]"
         colSpan={colSpan}
       >
         <span className="inline-flex items-center gap-2">
@@ -432,11 +432,11 @@ function DataRow({
   const hasChildren = Boolean(onToggle);
   const label = displayLabel(row.label);
   return (
-    <tr className={cn(depth === 0 ? "odd:bg-white even:bg-slate-50/35" : "bg-slate-50/60", "hover:bg-slate-100/60")}>
+    <tr className={cn(depth === 0 ? "cf-data-row" : "cf-detail-row", "cf-hover-row")}>
       <td
         className={cn(
           "sticky left-0 z-10 border-b border-r border-slate-100 px-4 py-1.5 text-slate-600 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.45)]",
-          depth === 0 ? "bg-inherit pl-3" : "bg-slate-50/60 pl-12 text-slate-500",
+          depth === 0 ? "bg-inherit pl-3" : "cf-detail-surface pl-12 text-slate-500",
         )}
         title={label}
       >
@@ -445,7 +445,7 @@ function DataRow({
             <button
               type="button"
               onClick={onToggle}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-slate-200 cf-surface text-slate-600 transition-colors hover:border-slate-300 cf-button-hover hover:text-slate-900"
               aria-label={expanded ? "Ocultar detalle" : "Mostrar detalle"}
               title={expanded ? "Ocultar detalle" : "Mostrar detalle"}
             >
@@ -464,14 +464,14 @@ function DataRow({
           key={j}
           className={cn(
             "border-b border-r border-slate-100 px-3 py-1.5 text-right last:border-r-0",
-            isFutureMonth?.(j) && "bg-slate-50/50",
+            isFutureMonth?.(j) && "cf-future",
           )}
         >
           {cell(v, tone)}
         </td>
       ))}
       <td
-        className="sticky right-0 z-10 border-b border-l-2 border-slate-300 bg-slate-50 px-3 py-1.5 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]"
+        className="sticky right-0 z-10 border-b border-l-2 border-slate-300 cf-muted px-3 py-1.5 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]"
         title={formulaTitle?.(row)}
       >
         {cell(row.total, tone, true)}
@@ -499,8 +499,8 @@ function SubtotalRow({
 }) {
   const cellTone = tone === "financiamiento" ? "neutral" : tone;
   return (
-    <tr className="border-y border-slate-200 bg-slate-50 font-semibold">
-      <td className="sticky left-0 z-10 border-r border-slate-200 bg-slate-50 px-4 py-2 pl-8 text-slate-900 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.45)]">
+    <tr className="border-y border-slate-200 cf-muted font-semibold">
+      <td className="sticky left-0 z-10 border-r border-slate-200 cf-muted px-4 py-2 pl-8 text-slate-900 shadow-[8px_0_12px_-12px_rgba(15,23,42,0.45)]">
         {label}
       </td>
       {perMes.map((v, j) => (
@@ -508,7 +508,7 @@ function SubtotalRow({
           key={j}
           className={cn(
             "border-r border-slate-100 px-3 py-2 text-right last:border-r-0",
-            isFutureMonth?.(j) && "bg-slate-50/70",
+            isFutureMonth?.(j) && "cf-future",
           )}
           title={formulaTitle?.(j, v)}
         >
@@ -516,7 +516,7 @@ function SubtotalRow({
         </td>
       ))}
       <td
-        className="sticky right-0 z-10 border-l-2 border-slate-300 bg-slate-100 px-3 py-2 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]"
+        className="sticky right-0 z-10 border-l-2 border-slate-300 cf-total px-3 py-2 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]"
         title={formulaTitle?.(null, total)}
       >
         {cell(total, cellTone, true)}
@@ -528,7 +528,7 @@ function SubtotalRow({
 function EmptyRow({ colSpan, text }: { colSpan: number; text: string }) {
   return (
     <tr>
-      <td className="border-b border-slate-100 bg-white px-4 py-2 pl-8 italic text-slate-400" colSpan={colSpan}>
+      <td className="border-b border-slate-100 cf-surface px-4 py-2 pl-8 italic text-slate-400" colSpan={colSpan}>
         {text}
       </td>
     </tr>

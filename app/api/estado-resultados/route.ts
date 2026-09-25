@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { canEditPL, plRequest, PLStoreError, readPL } from '@/lib/pl-store';
+import { canEditPL, plRequest, PLStoreError, readPL, supportsPLFormulas } from '@/lib/pl-store';
+import { evaluateFormula } from '@/lib/pl-formula';
+import { previewCell } from '@/lib/pl-references';
 import { normalizeAmount, type PLAccount, type PLGroup, type PLValue } from '@/lib/pl-model';
 
 export const dynamic = 'force-dynamic';
@@ -11,6 +13,11 @@ function error(message: string, status = 400) { return NextResponse.json({ error
 function failure(e: unknown) {
   if (e instanceof PLStoreError && e.status === 409) return error('El registro cambió o ya existe. Actualiza los datos e inténtalo nuevamente.', 409);
   return error('No se pudo completar la operación. Revisa la conexión con Supabase e inténtalo nuevamente.', 503);
+}
+async function hasFormulaReferences(accountId: string) {
+  if (!await supportsPLFormulas()) return false;
+  const query = new URLSearchParams({ select:'id', formula:`like.*@[${accountId}:*`, limit:'1' });
+  return (await plRequest<Array<{id:string}>>('pl_monthly_values',query.toString())).length > 0;
 }
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -58,6 +65,9 @@ export async function POST(request: Request) {
       if (!groups.length) return error('El grupo ya no existe.', 404);
       const children = await plRequest<Array<{ id: string }>>('pl_groups', `select=id&parent_id=eq.${body.id}`);
       const accounts = await plRequest<PLAccount[]>('pl_accounts', `select=*&group_id=eq.${body.id}`);
+      if (body.action === 'delete-group') {
+        for (const account of accounts) if (await hasFormulaReferences(account.id)) return error('Una fórmula utiliza una cuenta de este grupo. Modifica esa fórmula antes de eliminarlo.', 409);
+      }
       const values = (await Promise.all(accounts.map(account => plRequest<Array<{ id: string }>>('pl_monthly_values', `select=id&account_id=eq.${account.id}&limit=1`)))).some(rows => rows.length > 0);
       const canDelete = !children.length && !values;
       if (body.action === 'remove-group-check') return NextResponse.json({ name: groups[0].name, accountCount: accounts.length, hasValues: values, hasChildren: children.length > 0, canDelete });
@@ -73,7 +83,9 @@ export async function POST(request: Request) {
       if (!accounts.length) return error('La cuenta ya no existe.', 404);
       // Check every year and currency, including explicit zero values.
       const values = await plRequest<Array<{ id: string }>>('pl_monthly_values', `select=id&account_id=eq.${body.id}&limit=1`);
-      if (body.action === 'remove-check') return NextResponse.json({ hasValues: values.length > 0, name: accounts[0].name });
+      const referenced = await hasFormulaReferences(body.id);
+      if (body.action === 'remove-check') return NextResponse.json({ hasValues: values.length > 0 || referenced, name: accounts[0].name });
+      if (body.action === 'delete-account' && referenced) return error('Una fórmula utiliza esta cuenta. Archívala para conservar la referencia.', 409);
       if (body.action === 'delete-account' && values.length) return error('Esta cuenta tiene importes. Debes archivarla para conservarlos.', 409);
       const rows = await plRequest<PLAccount[]>('pl_accounts', `id=eq.${body.id}&select=*`, {
         method: body.action === 'delete-account' ? 'DELETE' : 'PATCH',
@@ -113,18 +125,36 @@ export async function POST(request: Request) {
     }
     if (body.action !== 'value' || !period(body.year, body.currency) || !Number.isInteger(body.month) || body.month < 1 || body.month > 12 || typeof body.accountId !== 'string' || !uuid.test(body.accountId)) return error('Cuenta o período inválidos.');
     if (body.previous !== null && (typeof body.previous !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(body.previous))) return error('Versión del registro inválida.');
+    const formulasEnabled = await supportsPLFormulas();
+    let formula: string | null = null;
+    if (body.formula !== undefined && body.formula !== null) {
+      if (typeof body.formula !== 'string') return error('Fórmula inválida.');
+      if (!formulasEnabled) return error('Las fórmulas todavía no están habilitadas en la base de datos.', 409);
+      formula = body.formula.trim();
+    }
     let amount: string | null = null;
-    if (body.amount !== null) {
+    if (formula !== null) {
+      try {
+        if (formula.includes('@[')) {
+          const snapshot = await readPL(body.year, body.currency);
+          const calculated = previewCell(snapshot, body.accountId, body.month, formula);
+          if (calculated.formulaError) return error(calculated.formulaError);
+          amount = calculated.amount;
+        } else { amount = evaluateFormula(formula); }
+      }
+      catch (e) { return error((e as Error).message); }
+    } else if (body.amount !== null) {
       try { if (typeof body.amount !== 'string') throw new Error(); amount = normalizeAmount(body.amount); }
       catch { return error('Importe inválido: usa hasta 14 enteros y 6 decimales, sin separadores de miles.'); }
     }
     const accounts = await plRequest<PLAccount[]>('pl_accounts', `select=*&id=eq.${body.accountId}&active=eq.true`);
     if (!accounts.length) return error('La cuenta no existe o está inactiva.');
-    const query = new URLSearchParams({ account_id: `eq.${body.accountId}`, year: `eq.${body.year}`, month: `eq.${body.month}`, currency: `eq.${body.currency}`, select: 'id,account_id,year,month,currency,amount::text,updated_at' });
+    const selection = `id,account_id,year,month,currency,amount::text,updated_at${formulasEnabled ? ',formula' : ''}`;
+    const query = new URLSearchParams({ account_id: `eq.${body.accountId}`, year: `eq.${body.year}`, month: `eq.${body.month}`, currency: `eq.${body.currency}`, select: selection });
     if (body.previous !== null) query.set('updated_at', `eq.${body.previous}`);
-    const payload = { account_id: body.accountId, year: body.year, month: body.month, currency: body.currency, amount, updated_by: session.user.email, updated_at: new Date().toISOString() };
+    const payload = { account_id: body.accountId, year: body.year, month: body.month, currency: body.currency, amount, ...(formulasEnabled ? { formula } : {}), updated_by: session.user.email, updated_at: new Date().toISOString() };
     if (body.previous === null && amount === null) return NextResponse.json({ value: null });
-    const rows = await plRequest<PLValue[]>('pl_monthly_values', body.previous === null ? 'select=id,account_id,year,month,currency,amount::text,updated_at' : query.toString(), {
+    const rows = await plRequest<PLValue[]>('pl_monthly_values', body.previous === null ? `select=${selection}` : query.toString(), {
       method: body.previous === null ? 'POST' : amount === null ? 'DELETE' : 'PATCH',
       headers: { Prefer: 'return=representation' },
       ...(amount === null ? {} : { body: JSON.stringify(payload) }),

@@ -57,3 +57,75 @@
 .kpi-icon-bg {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(37, 99, 235, 0.02));
 }
+
+/* Shared theme tokens and compatibility for existing dashboard surfaces. */
+@layer base {
+  .dark {
+    --background: 215 55% 7%;
+    --foreground: 210 30% 94%;
+    --card: 214 43% 11%;
+    --card-foreground: 210 30% 94%;
+    --popover: 214 43% 11%;
+    --popover-foreground: 210 30% 94%;
+    --primary: 213 90% 65%;
+    --primary-foreground: 215 55% 7%;
+    --secondary: 215 30% 17%;
+    --secondary-foreground: 210 30% 94%;
+    --muted: 215 30% 17%;
+    --muted-foreground: 215 20% 68%;
+    --accent: 215 30% 20%;
+    --accent-foreground: 210 30% 94%;
+    --border: 215 28% 22%;
+    --input: 215 28% 22%;
+    --ring: 213 90% 65%;
+  }
+}
+.dark .bg-white { background-color: hsl(var(--card)); }
+.dark .bg-slate-50, .dark .bg-slate-100 { background-color: hsl(var(--background)); }
+.dark [class*="border-slate-200"], .dark [class*="border-slate-100"] { border-color: hsl(var(--border)); }
+.dark .text-slate-950, .dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700 { color: hsl(var(--foreground)); }
+.dark .text-slate-600, .dark .text-slate-500 { color: hsl(var(--muted-foreground)); }
+.dark .bg-blue-50, .dark .bg-emerald-50, .dark .bg-rose-50, .dark .bg-amber-50 { background-color: hsl(var(--muted)); }
+.dark .text-blue-900, .dark .text-blue-800 { color: #93c5fd; }
+.dark .text-emerald-900, .dark .text-emerald-700, .dark .text-emerald-600 { color: #6ee7b7; }
+.dark .text-rose-900, .dark .text-rose-800, .dark .text-rose-700, .dark .text-rose-600 { color: #fda4af; }
+.dark .text-amber-900, .dark .text-amber-700 { color: #fcd34d; }
+.dark .hover\:bg-slate-50:hover, .dark .hover\:bg-slate-100:hover, .dark .hover\:bg-blue-50:hover { background-color: hsl(var(--muted)); }
+.dark .recharts-cartesian-grid line { stroke: hsl(var(--border)); }
+.dark .recharts-label-list text { fill: #cbd5e1; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+/* Opaque surfaces keep the cash-flow matrix legible, including sticky cells. */
+.cash-flow-table {
+  --cf-surface: #ffffff;
+  --cf-stripe: #f8fafc;
+  --cf-detail: #f1f5f9;
+  --cf-hover: #eaf1fa;
+  --cf-muted: #f1f5f9;
+  --cf-total: #e8eef5;
+  --cf-future: #f8fafc;
+  --cf-zero: #94a3b8;
+}
+.dark .cash-flow-table {
+  --cf-surface: #101e30;
+  --cf-stripe: #142338;
+  --cf-detail: #17283e;
+  --cf-hover: #1d3551;
+  --cf-muted: #192d45;
+  --cf-total: #203953;
+  --cf-future: #0d1929;
+  --cf-zero: #73879f;
+}
+.cash-flow-table .cf-surface { background-color: var(--cf-surface); }
+.cash-flow-table .cf-muted { background-color: var(--cf-muted); }
+.cash-flow-table .cf-total { background-color: var(--cf-total); }
+.cash-flow-table .cf-data-row { background-color: var(--cf-surface); }
+.cash-flow-table .cf-data-row:nth-child(even) { background-color: var(--cf-stripe); }
+.cash-flow-table .cf-detail-row, .cash-flow-table .cf-detail-surface { background-color: var(--cf-detail); }
+.cash-flow-table .cf-hover-row:hover, .cash-flow-table .cf-hover-row:hover > td:first-child,
+.cash-flow-table .cf-button-hover:hover { background-color: var(--cf-hover); }
+.cash-flow-table .cf-future { background-color: var(--cf-future); }
+.cash-flow-table .cf-zero { color: var(--cf-zero); }
+.dark .cash-flow-table [class*="border-slate-300"] { border-color: #30455e; }
+.dark .cash-flow-table .text-slate-600 { color: #bacade; }
+.dark .cash-flow-table .text-slate-800 { color: #e2eaf5; }

@@ -31,8 +31,42 @@ no se sobrescriben si cambió su versión desde la lectura: cancelar y actualiza
 Los totales suman lo cargado y pueden ser parciales. El resultado operativo exige
 un importe para cada cuenta de ingresos y egresos del mes. USD y BOB son cargas
 independientes; no hay conversión automática ni edición de tipo de cambio.
-No se incluyen todavía importación de Excel, fórmulas de usuario ni historial
+No se incluyen todavía importación de Excel, referencias entre celdas ni historial
 completo. updated_by y updated_at identifican la última modificación del importe.
+
+## Fórmulas aritméticas
+
+Ejecutar una vez `supabase/migrations/20260924_pl_formulas.sql` en el SQL Editor
+de Supabase y actualizar el dashboard. Agrega la columna opcional `formula`;
+los importes existentes permanecen intactos. Antes de aplicar el script, la
+lectura y la carga de números siguen disponibles y las fórmulas quedan bloqueadas.
+
+En una celda escribir `=10000-2500`, `=(1000+500)/3` o `=50000*15%`.
+Admite +, -, *, /, %, paréntesis y signo negativo; decimales con coma o punto,
+sin separadores de miles. Un porcentaje representa una división entre 100:
+`=100+10%` da 100,1; para aumentar 100 en 10% usar `=100*(1+10%)`.
+Los resultados se expresan en la moneda de la celda, sin formato de porcentaje.
+La vista previa muestra el resultado; Guardar o Enter conserva fórmula y resultado.
+La tabla muestra solo el resultado. Al reabrir la celda se recupera la fórmula.
+Sustituirla por un número elimina la fórmula; vaciar la celda elimina ambos.
+
+El servidor vuelve a calcular la expresión, no confía en el resultado enviado.
+Usa fracciones exactas y redondea al final a seis decimales. Detecta división por
+cero, sintaxis inválida y resultados fuera del rango. No ejecuta JavaScript.
+Admite referencias como `=D2+E4`: B corresponde a enero y M a diciembre.
+Los números junto a las cuentas identifican las filas; títulos y totales no son
+celdas referenciables. Las referencias usan el año y moneda seleccionados.
+Se guardan vinculadas al identificador de la cuenta: mover filas actualiza la
+referencia visible sin cambiar la cuenta utilizada. Contraer grupos no cambia
+la numeración. Las celdas sin importe se calculan como cero.
+
+Los resultados dependientes se recalculan al leer el P&L y al guardar desde la
+web. El campo amount almacenado de una fórmula es una instantánea; consultas
+externas directas deben recalcular sus dependencias. Los ciclos se rechazan al
+guardar y los errores de cálculo se muestran como #ERROR, sin mostrar resultados
+anteriores. Las cuentas referenciadas se pueden archivar pero no eliminar.
+No incluye rangos, SUMA ni referencias a otros años u hojas. No requiere otra
+migración aparte de la columna formula indicada arriba.
 
 ## Catálogo inicial
 
