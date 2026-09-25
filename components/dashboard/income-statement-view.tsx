@@ -6,6 +6,7 @@ import { displayAmount, sumAmounts, type PLAccount, type PLData, type PLGroup, t
 import { parseCellInput } from '@/lib/pl-formula';
 import { cellAddress, compileFormula, displayFormula, previewCell, recalculateValues, referenceRows } from '@/lib/pl-references';
 import { cn } from '@/lib/utils';
+import { FormulaDetailsCard } from './formula-details-card';
 
 const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEPT', 'OCT', 'NOV', 'DIC'];
 const tones: Record<string, string> = { SOCIOS: 'bg-blue-50 text-blue-900', INGRESOS: 'bg-emerald-50 text-emerald-900', EGRESOS: 'bg-rose-50 text-rose-900', INVERSION: 'bg-amber-50 text-amber-900' };
@@ -30,14 +31,55 @@ export function IncomeStatementView() {
   const [collapsed, setCollapsed] = useState(new Set<string>());
   const [editing, setEditing] = useState<{ account: PLAccount; month: number; previous: string | null } | null>(null);
   const [draft, setDraft] = useState('');
+  const [cellTyping, setCellTyping] = useState(false);
   const cellInput = useRef<HTMLInputElement>(null);
   const caret = useRef({ start: 0, end: 0 });
   const [pickedCell, setPickedCell] = useState('');
+  const [referenceTarget, setReferenceTarget] = useState<{id:string;month:number} | null>(null);
+  function navigateReference(account: PLAccount, month: number) {
+    setCollapsed(previous => {
+      const next = new Set(previous);
+      let groupId: string | null = account.group_id;
+      const visited = new Set<string>();
+      while (groupId && !visited.has(groupId)) {
+        visited.add(groupId); next.delete(groupId);
+        groupId = data?.groups.find(group => group.id === groupId)?.parent_id || null;
+      }
+      return next;
+    });
+    setPickedCell(cellAddress(numberedRows, account.id, month));
+    setReferenceTarget({id:account.id,month});
+  }
+  useEffect(() => {
+    if (!referenceTarget || !editing) return;
+    const target = document.getElementById(`pl-value-${referenceTarget.id}-${referenceTarget.month}`);
+    target?.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+    target?.focus({preventScroll:true});
+  }, [referenceTarget, editing]);
+
+  function openCell(account: PLAccount, month: number) {
+    const value = data?.values.find(v => v.account_id === account.id && v.month === month);
+    const initial = value?.formula ? displayFormula(value.formula, numberedRows) : value?.amount ?? '';
+    setEditing({account, month, previous:value?.updated_at || null});
+    setDraft(initial); setCellTyping(false); setPickedCell(''); setReferenceTarget(null); setFormError('');
+    caret.current = {start:initial.length,end:initial.length};
+    requestAnimationFrame(() => { cellInput.current?.focus({preventScroll:true}); cellInput.current?.scrollIntoView({block:'nearest',inline:'center'}); });
+  }
+  async function moveCell(account: PLAccount, month: number, key: string) {
+    const visible = numberedRows.filter(a => a.active && document.getElementById(`pl-value-${a.id}-1`));
+    const index = visible.findIndex(a => a.id === account.id);
+    const nextIndex = index + (key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0);
+    const nextMonth = month + (key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0);
+    if (!visible[nextIndex] || nextMonth < 1 || nextMonth > 12) return;
+    if (editing && cellTyping && !(await save())) return;
+    openCell(visible[nextIndex], nextMonth);
+  }
+
   function pickReference(address: string) {
     const { start, end } = caret.current;
     const next = draft.slice(0, start) + address + draft.slice(end);
     const position = start + address.length;
-    setDraft(next); setPickedCell(address); setFormError('');
+    setCellTyping(true); setDraft(next); setPickedCell(address); setFormError('');
     caret.current = { start: position, end: position };
     requestAnimationFrame(() => {
       cellInput.current?.focus({ preventScroll: true });
@@ -58,6 +100,24 @@ export function IncomeStatementView() {
   const [removalConfirmation, setRemovalConfirmation] = useState<{ id: string; name: string; hasValues: boolean } | null>(null);
   const [groupRemovalConfirmation, setGroupRemovalConfirmation] = useState<{ id: string; name: string; accountCount: number; hasValues: boolean; hasChildren: boolean; canDelete: boolean } | null>(null);
   const numberedRows = data ? referenceRows(data) : [];
+
+  useEffect(() => {
+    if (!editing) {
+      setReferenceTarget(null);
+      return;
+    }
+    const cancelOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.isComposing || saving) return;
+      event.preventDefault();
+      setEditing(null);
+      setDraft('');
+      setFormError('');
+      setPickedCell('');
+      setReferenceTarget(null);
+    };
+    window.addEventListener('keydown', cancelOnEscape);
+    return () => window.removeEventListener('keydown', cancelOnEscape);
+  }, [editing, saving]);
 
   function parseDraft() {
     if (!editing || !data || !draft.trim().startsWith('=')) return parseCellInput(draft);
@@ -91,7 +151,7 @@ export function IncomeStatementView() {
     try {
       payload = renaming ? { action: 'rename', kind: renaming.kind, id: renaming.id, previousName: renaming.name, name } : newSubgroup ? { action: 'group', sectionId: newSubgroup.section_id, parentId: newSubgroup.id, name } : newSection ? { action: 'group', sectionId: newSection.id, name } : editing ? { action: 'value', accountId: editing.account.id, month: editing.month, year, currency, previous: editing.previous, ...parseDraft() } : { action: 'account', groupId: newGroup?.id, name };
       if (editing && draft.trim().startsWith('=') && !data?.formulasEnabled) throw new Error('Las fórmulas todavía no están habilitadas en la base de datos.');
-    } catch (e) { setFormError((e as Error).message); return; }
+    } catch (e) { setFormError((e as Error).message); return false; }
     setSaving(true);
     try {
       const response = await fetch('/api/estado-resultados', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -109,7 +169,8 @@ export function IncomeStatementView() {
       });
       if (newGroup) setCollapsed(previous => { const next = new Set(previous); next.delete(newGroup.id); return next; });
       setEditing(null); setNewGroup(null); setNewSubgroup(null); setNewSection(null); setRenaming(null); setNotice('Cambios guardados en Supabase.');
-    } catch (e) { setFormError((e as Error).message); }
+      return true;
+    } catch (e) { setFormError((e as Error).message); return false; }
     finally { setSaving(false); }
   }
 
@@ -169,7 +230,7 @@ export function IncomeStatementView() {
   }
 
   function visibleAccounts(accounts: PLAccount[]) {
-    return accounts.filter(a => a.active || data?.values.some(v => v.account_id === a.id));
+    return accounts.filter(a => (editing && referenceTarget?.id === a.id) || a.active || data?.values.some(v => v.account_id === a.id));
   }
 
   function editableName(kind: 'accounts' | 'groups' | 'sections', record: { id: string; name: string }) {
@@ -249,20 +310,28 @@ export function IncomeStatementView() {
       const formula = value?.formula ? displayFormula(value.formula, numberedRows) : undefined;
       const address = account ? cellAddress(numberedRows,account.id,i+1) : '';
       const content = failed ? <span className="text-rose-500" title={value?.formulaError || 'Una cuenta contiene una fórmula con error.'}>#ERROR</span> : renderAmount(amount);
-      return <td key={label} className="h-10 min-w-[104px] border-b border-l border-slate-200/60 text-right text-xs tabular-nums">
+      return <td key={label} id={account ? `pl-value-${account.id}-${i+1}` : undefined} tabIndex={-1} onKeyDown={e => {
+        if (e.target instanceof HTMLInputElement || !account?.active || !data?.canEdit || saving || renaming || moving || editing) return;
+        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) { e.preventDefault(); void moveCell(account,i+1,e.key); }
+        if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); openCell(account,i+1); }
+      }} className={cn("h-10 min-w-[104px] border-b border-l border-slate-200/60 text-right text-xs tabular-nums", account && editing && pickedCell === address && 'bg-emerald-50 ring-2 ring-inset ring-emerald-500 outline-none')}>
         {account && editing?.account.id === account.id && editing.month === i + 1 ? <input
           ref={cellInput} autoFocus aria-label={`Editar ${account.name}, ${label}`} disabled={saving}
           className="h-10 w-full min-w-[104px] bg-white px-3 text-right text-sm text-slate-900 outline outline-2 -outline-offset-2 outline-blue-500"
           value={draft} maxLength={500} onFocus={e => { caret.current = {start:e.currentTarget.selectionStart ?? draft.length,end:e.currentTarget.selectionEnd ?? draft.length}; }}
           onSelect={e => { caret.current = {start:e.currentTarget.selectionStart ?? draft.length,end:e.currentTarget.selectionEnd ?? draft.length}; }}
-          onChange={e => { setDraft(e.target.value); setFormError(''); setPickedCell(''); caret.current = {start:e.target.selectionStart ?? 0,end:e.target.selectionEnd ?? 0}; }}
-          onKeyDown={e => { if (e.nativeEvent.isComposing) return; if (e.key === 'Enter') { e.preventDefault(); if (!saving) void save(); } if (e.key === 'Escape' && !saving) { setEditing(null); setFormError(''); setPickedCell(''); } }}
+          onChange={e => { setCellTyping(true); setDraft(e.target.value); setFormError(''); setPickedCell(''); caret.current = {start:e.target.selectionStart ?? 0,end:e.target.selectionEnd ?? 0}; }}
+          onKeyDown={e => { if (e.nativeEvent.isComposing || saving) return;
+            if (e.key === 'F2') { e.preventDefault(); setCellTyping(true); return; }
+            if (e.key === 'Delete' || e.key === 'Backspace') { setCellTyping(true); return; }
+            if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key) && (!cellTyping || !draft.trim().startsWith('='))) { e.preventDefault(); void moveCell(account, i+1, e.key); return; }
+            if (e.key === 'Enter') { e.preventDefault(); if (!saving) void save(); } if (e.key === 'Escape' && !saving) { setEditing(null); setFormError(''); setPickedCell(''); } }}
         /> : account && data?.canEdit && (account.active || editing?.account && draft.trim().startsWith('=')) ? <button type="button"
           disabled={Boolean(renaming) || moving || saving || Boolean(editing && !draft.trim().startsWith('='))}
           className={cn('h-full min-h-10 w-full px-3 py-2 text-right hover:bg-blue-100/60 focus-visible:outline-blue-500', editing && pickedCell === address && 'bg-emerald-50 ring-2 ring-inset ring-emerald-500')}
           title={`${address}${formula ? ' · '+formula : ''}`} aria-label={`${editing ? 'Seleccionar' : 'Editar'} ${address}, ${account.name}, ${label} ${year}, ${currency}`}
           onMouseDown={e => { if (editing) e.preventDefault(); }}
-          onClick={() => { if (editing) { pickReference(address); return; } setEditing({ account, month: i + 1, previous: value?.updated_at || null }); const initial = formula ?? value?.amount ?? ''; setDraft(initial); caret.current = {start:initial.length,end:initial.length}; setPickedCell(''); setFormError(''); }}
+          onClick={() => { if (editing) { pickReference(address); return; } openCell(account, i + 1); }}
         >{content}</button> : <span className="px-3" title={formula} aria-label={amount === null && !failed ? 'Sin datos' : undefined}>{content}</span>}
       </td>;
     })}<td className="min-w-[112px] border-b border-l border-slate-200/60 px-3 text-right text-xs font-semibold tabular-nums">{hasFormulaError(accounts) ? <span className="text-rose-500">#ERROR</span> : renderAmount(sumAmounts(valuesFor(accounts)))}</td></>;
@@ -309,6 +378,7 @@ export function IncomeStatementView() {
       <label className="text-xs text-slate-500">Ejercicio<select className="mt-2 block rounded-lg border bg-white px-3 py-2 text-sm text-slate-900" value={year} disabled={modal} onChange={e => { setYear(Number(e.target.value)); setNotice(''); }}>{[2025, 2026, 2027].map(y => <option key={y}>{y}</option>)}</select></label>
       <label className="text-xs text-slate-500">Moneda de los importes<select className="mt-2 block rounded-lg border bg-white px-3 py-2 text-sm text-slate-900" value={currency} disabled={modal} onChange={e => { setCurrency(e.target.value); setNotice(''); }}><option value="USD">USD · Dólares</option><option value="BOB">BOB · Bolivianos</option></select></label></div>
       <div className="flex flex-wrap gap-2"><button className={button} disabled={saving || moving || Boolean(renaming)} onClick={() => setCollapsed(new Set())}>Expandir todo</button><button className={button} disabled={modal} onClick={() => setCollapsed(new Set(data?.groups.map(g => g.id)))}>Contraer todo</button><button className={button} disabled={loading || modal} onClick={() => { setRevision(r => r + 1); setNotice(''); }}><RefreshCw className="mr-1 inline h-3 w-3" />Actualizar</button></div></div>
+    {editing && data && <FormulaDetailsCard anchor={cellInput} draft={draft} rows={numberedRows} data={data} currency={currency} error={formError || formulaError} onNavigate={navigateReference} />}
     {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
     {error && <p role="alert" className="rounded-lg bg-rose-50 p-4 text-sm text-rose-800">{error}</p>}
     {loading && <p role="status" className="p-6 text-sm text-slate-500">Cargando cuentas e importes…</p>}
