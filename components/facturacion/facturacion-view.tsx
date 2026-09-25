@@ -70,14 +70,14 @@ export function FacturacionView() {
   const [data, setData] = useState<FacturacionRow[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [moneda, setMoneda] = useState<Moneda>("USD");
   const [dateStart, setDateStart] = useState<string>("ALL");
   const [dateEnd, setDateEnd] = useState<string>("ALL");
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
     Object.fromEntries(COLUMNS.map(c => [c.key, true]))
   );
-  
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -104,7 +104,7 @@ export function FacturacionView() {
     const ds = new Map<string, string>();
     data.forEach(d => {
       const val = d.fecha.substring(0, 7); // YYYY-MM
-      const label = `${d.mes.substring(0,3)} ${d.ano}`;
+      const label = `${d.mes.substring(0, 3)} ${d.ano}`;
       if (!ds.has(val)) ds.set(val, label);
     });
     return Array.from(ds.entries()).map(([value, label]) => ({ value, label })).sort((a, b) => a.value.localeCompare(b.value));
@@ -112,7 +112,7 @@ export function FacturacionView() {
 
   const filteredAndConvertedData = useMemo(() => {
     if (!data) return [];
-    
+
     // Filtro por fechas
     let filtered = data;
     if (dateStart !== "ALL" || dateEnd !== "ALL") {
@@ -123,19 +123,19 @@ export function FacturacionView() {
         return passStart && passEnd;
       });
     }
-    
+
     // Conversión de moneda
     return filtered.map(row => {
       const multiplier = moneda === "BOB" ? row.tc : 1;
       const newRow: any = {
-        name: `${row.mes.substring(0,3)} ${row.ano}`,
+        name: `${row.mes.substring(0, 3)} ${row.ano}`,
       };
       COLUMNS.forEach(c => {
         newRow[c.key] = (row as any)[c.key] * multiplier;
       });
       return newRow;
     });
-  }, [data, yearSelected, moneda]);
+  }, [data, dateStart, dateEnd, moneda]);
 
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
@@ -252,7 +252,7 @@ export function FacturacionView() {
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <h2 className="text-lg font-bold text-slate-800">Evolución General</h2>
-          
+
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 max-w-sm">
             <div className="mb-2 flex items-center gap-2">
               <Filter className="h-4 w-4 text-slate-500" />
@@ -265,8 +265,8 @@ export function FacturacionView() {
                   onClick={() => toggleColumn(c.key)}
                   className={cn(
                     "rounded px-2 py-1 text-[10px] font-semibold transition-colors border",
-                    visibleColumns[c.key] 
-                      ? "bg-slate-800 text-white border-slate-800" 
+                    visibleColumns[c.key]
+                      ? "bg-slate-800 text-white border-slate-800"
                       : "bg-white text-slate-400 border-slate-200 hover:bg-slate-100"
                   )}
                   style={visibleColumns[c.key] ? { backgroundColor: c.color, borderColor: c.color } : {}}
@@ -283,10 +283,10 @@ export function FacturacionView() {
             <LineChart data={filteredAndConvertedData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-              <YAxis 
-                tick={{ fontSize: 12, fill: '#64748b' }} 
-                axisLine={false} 
-                tickLine={false} 
+              <YAxis
+                tick={{ fontSize: 12, fill: '#64748b' }}
+                axisLine={false}
+                tickLine={false}
                 tickFormatter={(val) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(val)}
               />
               <Tooltip content={<CustomTooltip moneda={moneda} />} />
@@ -308,10 +308,10 @@ export function FacturacionView() {
               <LineChart data={filteredAndConvertedData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis 
-                  tick={{ fontSize: 12, fill: '#64748b' }} 
-                  axisLine={false} 
-                  tickLine={false} 
+                <YAxis
+                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
                   tickFormatter={(val) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(val)}
                 />
                 <Tooltip content={<CustomTooltip moneda={moneda} />} />
@@ -332,10 +332,10 @@ export function FacturacionView() {
               <LineChart data={filteredAndConvertedData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis 
-                  tick={{ fontSize: 12, fill: '#64748b' }} 
-                  axisLine={false} 
-                  tickLine={false} 
+                <YAxis
+                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
                   tickFormatter={(val) => new Intl.NumberFormat("es-BO", { notation: "compact" }).format(val)}
                 />
                 <Tooltip content={<CustomTooltip moneda={moneda} />} />
