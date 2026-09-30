@@ -1,15 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
 import {
-  Area,
-  ComposedChart,
-  Line,
-  CartesianGrid,
-  XAxis,
-  YAxis,
   Tooltip,
   ResponsiveContainer,
-  Legend,
   PieChart,
   Pie,
   Cell,
@@ -43,13 +36,10 @@ export function CashSummaryPanels({
   forecastUnavailable: boolean;
 }) {
   const [month, setMonth] = useState(() => cashMonth(new Date()));
-  const [lineField, setLineField] = useState<
-    "descPL" | "conceptoPL" | "oficina"
-  >("descPL");
   const data = useMemo(
     () =>
-      buildCashSummary(real, planned, month, currency, new Date(), lineField),
-    [real, planned, month, currency, lineField],
+      buildCashSummary(real, planned, month, currency, new Date()),
+    [real, planned, month, currency],
   );
   const money = (n: number | null) =>
     n === null
@@ -112,124 +102,7 @@ export function CashSummaryPanels({
           BOB del flujo.
         </p>
       )}
-      <div className="grid gap-3 xl:grid-cols-5">
-        <div className={`${panel} xl:col-span-3`}>
-          <h3 className="text-sm font-semibold">Desempeño diario del mes</h3>
-          <p className="mb-2 mt-1 text-xs text-muted-foreground">
-            Ingresos acumulados · Real y flujo proyectado
-          </p>
-          <div className="h-[180px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data.daily}>
-                <defs>
-                  <linearGradient
-                    id="cash-income-fill"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.35} />
-                    <stop
-                      offset="100%"
-                      stopColor="#3b82f6"
-                      stopOpacity={0.02}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
-                <XAxis
-                  dataKey="day"
-                  tickLine={false}
-                  axisLine={false}
-                  stroke="#94a3b8"
-                  fontSize={11}
-                />
-                <YAxis
-                  width={65}
-                  tickFormatter={(v) =>
-                    new Intl.NumberFormat("es", { notation: "compact" }).format(
-                      v,
-                    )
-                  }
-                  tickLine={false}
-                  axisLine={false}
-                  stroke="#94a3b8"
-                  fontSize={11}
-                />
-                <Tooltip
-                  contentStyle={tooltip}
-                  formatter={(v: number) => money(v)}
-                  labelFormatter={(v) => `Día ${v}`}
-                />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="actual"
-                  name="Real"
-                  stroke="#3b82f6"
-                  strokeWidth={3}
-                  fill="url(#cash-income-fill)"
-                  connectNulls={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="forecast"
-                  name="Proyectado"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        <div className={`${panel} xl:col-span-2`}>
-          <h3 className="text-sm font-semibold">
-            Ingresos por línea de negocio
-          </h3>
-          <label className="mt-2 block text-xs text-muted-foreground">
-            Agrupar por{" "}
-            <select
-              aria-label="Agrupar ingresos"
-              value={lineField}
-              onChange={(e) => setLineField(e.target.value as typeof lineField)}
-              className="rounded border bg-card p-1"
-            >
-              <option value="descPL">Desc P&amp;L</option>
-              <option value="conceptoPL">Concepto P&amp;L</option>
-              <option value="oficina">Oficina</option>
-            </select>
-          </label>
-          <div className="mt-5 max-h-44 space-y-4 overflow-y-auto">
-            {data.lines.length ? (
-              data.lines.map((r) => (
-                <div key={r.name}>
-                  <div className="mb-1 flex justify-between gap-3 text-xs">
-                    <span>{r.name}</span>
-                    <strong className="shrink-0 tabular-nums">
-                      {money(r.value)}
-                    </strong>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-blue-500"
-                      style={{
-                        width: `${Math.max(0, (r.value / Math.max(...data.lines.map((r) => r.value))) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Sin ingresos registrados en el mes.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="grid gap-3 xl:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <div className={panel}>
           <h3 className="mb-1 font-semibold">Variaciones principales</h3>
           <p className="mb-2 text-xs text-muted-foreground">
