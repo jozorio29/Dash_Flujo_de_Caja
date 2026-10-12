@@ -276,13 +276,6 @@ export function DashboardView() {
           {/* ── ROW 1: 4 KPI cards ── */}
           <KpiCardsV2 kpis={kpisV2} moneda={filters.moneda} />
 
-          <CashSummaryPanels
-            real={allMovements || []}
-            planned={allProjected}
-            currency={filters.moneda}
-            forecastUnavailable={forecastUnavailable}
-          />
-
           {/* ── ROW 2: Flujo Mensual (2/3) + Donut Gastos (1/3) ── */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <div className="lg:col-span-2">
@@ -313,6 +306,13 @@ export function DashboardView() {
               moneda={filters.moneda}
             />
           </div>
+
+          <CashSummaryPanels
+            real={allMovements || []}
+            planned={allProjected}
+            currency={filters.moneda}
+            forecastUnavailable={forecastUnavailable}
+          />
 
           {/* ── ROW 4: Detalle amplio de la categoría seleccionada ── */}
           <ExpenseCategoryDetail

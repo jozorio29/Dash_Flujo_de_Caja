@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PanelLeftOpen } from "lucide-react";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils";
 
@@ -52,9 +51,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className={cn("flex-1 overflow-x-auto", !sidebarOpen && "md:pt-10")}>
         {children}
       </main>
-      <div className="fixed bottom-4 right-4 z-40">
-        <ThemeToggle />
-      </div>
     </div>
   );
 }

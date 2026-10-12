@@ -22,10 +22,10 @@ function LoginContent() {
     (urlError === "AccessDenied"
       ? "Tu email no está autorizado para acceder a este dashboard."
       : urlError === "CredentialsSignin"
-      ? "Email o contraseña incorrectos."
-      : urlError
-      ? "Ocurrió un error al iniciar sesión. Intenta de nuevo."
-      : null);
+        ? "Email o contraseña incorrectos."
+        : urlError
+          ? "Ocurrió un error al iniciar sesión. Intenta de nuevo."
+          : null);
 
   async function handleCredentials(e: React.FormEvent) {
     e.preventDefault();
@@ -50,24 +50,8 @@ function LoginContent() {
       <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 lg:grid-cols-2">
         {/* ── Panel izquierdo: formulario ─────────────────────────── */}
         <div className="flex flex-col justify-center px-8 py-10 sm:px-12">
-          <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-[#f2f2f2] shadow-md">
-              <img
-                src="/xtendo-logo.svg"
-                alt="Xtendo"
-                className="h-full w-full object-contain"
-              />
-            </div>
-            <div className="leading-tight">
-              <div className="text-sm font-semibold text-slate-900">Xtendo</div>
-              <div className="text-[11px] uppercase tracking-wider text-slate-400">
-                Flujo de Caja
-              </div>
-            </div>
-          </div>
-
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Inicia sesión 
+            Inicia sesión
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             Usa tu cuenta de Google de la empresa o tus credenciales.
@@ -171,64 +155,15 @@ function LoginContent() {
           </p>
         </div>
 
-        {/* ── Panel derecho: preview ──────────────────────────────── */}
-        <div className="relative hidden flex-col justify-center overflow-hidden bg-gradient-to-br from-[#0B1B3B] via-blue-900 to-blue-700 p-10 lg:flex">
-          <div className="relative z-10">
-            <p className="text-lg font-medium leading-snug text-blue-100">
-              Gestiona el flujo de caja de tu empresa{" "}
-              <span className="font-semibold text-white">
-                con datos en tiempo real
-              </span>
-            </p>
-
-            {/* Mock del dashboard */}
-            <div className="mt-8 rounded-2xl bg-white/95 p-4 shadow-2xl ring-1 ring-white/20">
-              <div className="flex gap-3">
-                {/* mini sidebar */}
-                <div className="hidden w-20 shrink-0 flex-col gap-2 rounded-lg bg-[#0B1B3B] p-2 xl:flex">
-                  <div className="h-2 w-10 rounded bg-white/40" />
-                  <div className="mt-2 h-1.5 w-full rounded bg-blue-400/60" />
-                  <div className="h-1.5 w-full rounded bg-white/15" />
-                  <div className="h-1.5 w-full rounded bg-white/15" />
-                  <div className="h-1.5 w-full rounded bg-white/15" />
-                </div>
-                {/* contenido */}
-                <div className="min-w-0 flex-1">
-                  <div className="mb-3 h-2 w-24 rounded bg-slate-300" />
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-lg bg-emerald-50 p-2 ring-1 ring-emerald-100">
-                      <div className="h-1.5 w-8 rounded bg-emerald-300" />
-                      <div className="mt-1.5 h-2.5 w-12 rounded bg-emerald-500" />
-                    </div>
-                    <div className="rounded-lg bg-rose-50 p-2 ring-1 ring-rose-100">
-                      <div className="h-1.5 w-8 rounded bg-rose-300" />
-                      <div className="mt-1.5 h-2.5 w-12 rounded bg-rose-400" />
-                    </div>
-                    <div className="rounded-lg bg-blue-50 p-2 ring-1 ring-blue-100">
-                      <div className="h-1.5 w-8 rounded bg-blue-300" />
-                      <div className="mt-1.5 h-2.5 w-12 rounded bg-blue-500" />
-                    </div>
-                  </div>
-                  {/* barras */}
-                  <div className="mt-3 flex h-20 items-end gap-1.5 rounded-lg bg-slate-50 p-2 ring-1 ring-slate-100">
-                    {[35, 55, 40, 70, 50, 85, 60, 75, 45, 90, 65, 80].map(
-                      (h, i) => (
-                        <div
-                          key={i}
-                          style={{ height: `${h}%` }}
-                          className={
-                            i % 3 === 1
-                              ? "flex-1 rounded-t bg-blue-300"
-                              : "flex-1 rounded-t bg-blue-600"
-                          }
-                        />
-                      )
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* ── Panel derecho: marca ────────────────────────────────── */}
+        <div className="relative hidden items-center justify-center overflow-hidden bg-gradient-to-br from-[#0B1B3B] via-blue-900 to-blue-700 p-10 lg:flex">
+          <img
+            src="/xtendo-logo-dark.png"
+            alt="Xtendo Global"
+            width={3133}
+            height={976}
+            className="relative z-10 h-auto w-full object-contain"
+          />
 
           {/* decoración */}
           <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
