@@ -5,24 +5,57 @@ import { Loader2, AlertTriangle, Coins, Calendar, Filter } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { cn } from "@/lib/utils";
 
+// ─── Tipos (espejo del lib, sin importar el módulo server) ────────────────────
+
+type ColumnCategoria = "servicio" | "alquiler";
+
+interface FacturacionColumn {
+  key: string;
+  label: string;
+  categoria: ColumnCategoria;
+  sheetIndex: number;
+  /** Color asignado en el cliente desde la paleta */
+  color: string;
+}
+
 interface FacturacionRow {
   ano: number;
   mes: string;
-  tigoBolivia: number;
-  tigoUruguayCC: number;
-  tigoUruguayTM: number;
-  tigoUruguayCapCC: number;
-  tigoUruguayCapTV: number;
-  tigoUruguayCapPort: number;
-  tigoOtros: number;
-  alquilerPos: number;
-  alquilerSala: number;
-  alquilerZen: number;
   tc: number;
-  fecha: string; // From API it's string
+  fecha: string;
+  [key: string]: number | string;
 }
 
 type Moneda = "USD" | "BOB";
+
+// ─── Paleta de colores ─────────────────────────────────────────────────────────
+// Colores distribuidos ~18° a lo largo del círculo HSL con variaciones de
+// luminosidad para garantizar que ningún par adyacente se confunda visualmente.
+// Agregar más entradas si el sheet supera las 20 columnas de datos.
+
+const COLOR_PALETTE = [
+  "#e63946", // rojo vivo         hsl(356 78% 57%)
+  "#f4a261", // naranja suave     hsl(27  88% 67%)
+  "#2a9d8f", // verde azulado     hsl(174 57% 40%)
+  "#6a0572", // púrpura oscuro    hsl(296 86% 23%)
+  "#457b9d", // azul acero        hsl(204 38% 44%)
+  "#e9c46a", // amarillo dorado   hsl(43  75% 67%)
+  "#264653", // verde petróleo    hsl(195 42% 23%)
+  "#f77f00", // naranja intenso   hsl(31  100% 48%)
+  "#8338ec", // violeta eléctrico hsl(267 82% 56%)
+  "#06d6a0", // turquesa neón     hsl(162 96% 43%)
+  "#d62828", // rojo carmesí      hsl(0   68% 50%)
+  "#3a86ff", // azul brillante    hsl(217 100% 62%)
+  "#fb5607", // naranja rojo      hsl(20  96% 50%)
+  "#52b788", // verde esmeralda   hsl(151 37% 52%)
+  "#c77dff", // lavanda           hsl(279 100% 74%)
+  "#118ab2", // azul oceánico     hsl(197 82% 38%)
+  "#ffb703", // ámbar puro        hsl(42  100% 54%)
+  "#b5179e", // fucsia            hsl(308 74% 40%)
+  "#80b918", // verde lima        hsl(80  74% 41%)
+  "#ff006e", // rosa magenta      hsl(330 100% 50%)
+];
+
 
 const CustomTooltip = ({ active, payload, label, moneda }: any) => {
   if (active && payload && payload.length) {
@@ -85,33 +118,21 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
   ) : null;
 };
 
-const COLUMNS = [
-  { key: "tigoBolivia", label: "TIGO Bolivia (e-care)", color: "#2563eb" }, // blue-600
-  { key: "tigoUruguayCC", label: "TIGO Uruguay (Call center)", color: "#16a34a" }, // green-600
-  { key: "tigoUruguayTM", label: "TIGO Uruguay (telemarketing)", color: "#dc2626" }, // red-600
-  { key: "tigoUruguayCapCC", label: "TIGO Uruguay Call center Cap", color: "#d97706" }, // amber-600
-  { key: "tigoUruguayCapTV", label: "TIGO Uruguay Televentas Cap", color: "#9333ea" }, // purple-600
-  { key: "tigoUruguayCapPort", label: "TIGO Uruguay Portabilidad Cap", color: "#0891b2" }, // cyan-600
-  { key: "tigoOtros", label: "TIGO Otros servicios", color: "#4f46e5" }, // indigo-600
-  { key: "alquilerPos", label: "Alquiler Tupperware pos. trabajo", color: "#db2777" }, // pink-600
-  { key: "alquilerSala", label: "Alquiler Tupperware sala cap.", color: "#ea580c" }, // orange-600
-  { key: "alquilerZen", label: "Alquiler Torre Zen Piso 2 pos.", color: "#059669" }, // emerald-600
-];
-
-const COLUMNS_SERVICIOS = COLUMNS.slice(0, 7);
-const COLUMNS_ALQUILERES = COLUMNS.slice(7, 10);
 
 export function FacturacionView() {
   const [data, setData] = useState<FacturacionRow[] | null>(null);
+  const [columns, setColumns] = useState<FacturacionColumn[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [moneda, setMoneda] = useState<Moneda>("USD");
   const [dateStart, setDateStart] = useState<string>("ALL");
   const [dateEnd, setDateEnd] = useState<string>("ALL");
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
-    Object.fromEntries(COLUMNS.map(c => [c.key, true]))
-  );
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({});
+
+  // Columnas derivadas dinámicamente por categoría
+  const COLUMNS_SERVICIOS = useMemo(() => columns.filter(c => c.categoria === "servicio"), [columns]);
+  const COLUMNS_ALQUILERES = useMemo(() => columns.filter(c => c.categoria === "alquiler"), [columns]);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,9 +141,20 @@ export function FacturacionView() {
         setLoading(true);
         const res = await fetch("/api/facturacion", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
+        // API now returns { columns, data }
+        const json: { columns: Omit<FacturacionColumn, "color">[]; data: FacturacionRow[] } = await res.json();
         if (cancelled) return;
+
+        // Asignar colores desde la paleta en el orden en que llegan
+        const coloredCols: FacturacionColumn[] = json.columns.map((col, idx) => ({
+          ...col,
+          color: COLOR_PALETTE[idx % COLOR_PALETTE.length],
+        }));
+
+        setColumns(coloredCols);
         setData(json.data);
+        // Inicializar visibilidad: todas activas
+        setVisibleColumns(Object.fromEntries(coloredCols.map(c => [c.key, true])));
         setError(null);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Error");
@@ -161,50 +193,50 @@ export function FacturacionView() {
 
     // Conversión de moneda
     return filtered.map(row => {
-      const multiplier = moneda === "BOB" ? row.tc : 1;
+      const multiplier = moneda === "BOB" ? (row.tc as number) : 1;
       const newRow: any = {
         name: `${row.mes.substring(0, 3)} ${row.ano}`,
       };
-      COLUMNS.forEach(c => {
-        newRow[c.key] = (row as any)[c.key] * multiplier;
+      columns.forEach(c => {
+        newRow[c.key] = ((row[c.key] as number) || 0) * multiplier;
       });
       return newRow;
     });
-  }, [data, dateStart, dateEnd, moneda]);
+  }, [data, dateStart, dateEnd, moneda, columns]);
 
   const pieDataGlobal = useMemo(() => {
     const totals: Record<string, number> = {};
     let grandTotal = 0;
-    COLUMNS.forEach(c => totals[c.key] = 0);
+    columns.forEach(c => totals[c.key] = 0);
     filteredAndConvertedData.forEach(row => {
-      COLUMNS.forEach(c => {
+      columns.forEach(c => {
         if (visibleColumns[c.key]) {
           totals[c.key] += (row[c.key] || 0);
         }
       });
     });
-    const result = COLUMNS.filter(c => visibleColumns[c.key] && totals[c.key] > 0).map(c => {
+    const result = columns.filter(c => visibleColumns[c.key] && totals[c.key] > 0).map(c => {
       grandTotal += totals[c.key];
       return {
         name: c.label,
         value: totals[c.key],
-        color: c.color
+        color: c.color,
       };
     });
     return result.map(d => ({ ...d, percentage: grandTotal > 0 ? (d.value / grandTotal) * 100 : 0 }));
-  }, [filteredAndConvertedData, visibleColumns]);
+  }, [filteredAndConvertedData, visibleColumns, columns]);
 
   const pieDataServicios = useMemo(() => {
     const filtered = pieDataGlobal.filter(d => COLUMNS_SERVICIOS.some(c => c.label === d.name));
     const total = filtered.reduce((acc, curr) => acc + curr.value, 0);
     return filtered.map(d => ({ ...d, percentage: total > 0 ? (d.value / total) * 100 : 0 }));
-  }, [pieDataGlobal]);
+  }, [pieDataGlobal, COLUMNS_SERVICIOS]);
 
   const pieDataAlquileres = useMemo(() => {
     const filtered = pieDataGlobal.filter(d => COLUMNS_ALQUILERES.some(c => c.label === d.name));
     const total = filtered.reduce((acc, curr) => acc + curr.value, 0);
     return filtered.map(d => ({ ...d, percentage: total > 0 ? (d.value / total) * 100 : 0 }));
-  }, [pieDataGlobal]);
+  }, [pieDataGlobal, COLUMNS_ALQUILERES]);
 
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
@@ -328,7 +360,7 @@ export function FacturacionView() {
               <span className="text-xs font-semibold text-slate-600 uppercase">Filtrar Columnas</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              {COLUMNS.map(c => (
+              {columns.map(c => (
                 <button
                   key={c.key}
                   onClick={() => toggleColumn(c.key)}
@@ -360,7 +392,7 @@ export function FacturacionView() {
               />
               <Tooltip content={<CustomTooltip moneda={moneda} />} />
               <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "20px" }} />
-              {COLUMNS.map(c => visibleColumns[c.key] && (
+              {columns.map(c => visibleColumns[c.key] && (
                 <Line key={c.key} type="monotone" dataKey={c.key} name={c.label} stroke={c.color} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
               ))}
             </LineChart>

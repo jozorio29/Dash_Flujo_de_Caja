@@ -3,8 +3,8 @@ import { getFacturacionData } from "@/lib/sheets-facturacion";
 
 export async function GET() {
   try {
-    const data = await getFacturacionData();
-    return NextResponse.json({ data });
+    const result = await getFacturacionData();
+    return NextResponse.json(result); // { columns, data }
   } catch (error: any) {
     console.error("Facturacion API error:", error);
     return NextResponse.json(
@@ -13,3 +13,4 @@ export async function GET() {
     );
   }
 }
+
