@@ -49,7 +49,13 @@ const DATA_START = 2;
 function findTCRelIdx(dataHeaders: string[]): number | null {
   for (let i = 0; i < dataHeaders.length; i++) {
     const h = dataHeaders[i].trim().toLowerCase();
-    if (h === "tc" || h === "t.c." || h.includes("tipo de cambio")) {
+    if (
+      h === "tc" ||
+      h === "t.c." ||
+      h.startsWith("tc ") ||   // captura "TC PARALELO", "TC Paralelo", etc.
+      h.startsWith("t.c.") ||
+      h.includes("tipo de cambio")
+    ) {
       return i;
     }
   }
@@ -98,12 +104,16 @@ export async function getFacturacionData(): Promise<FacturacionResult> {
   // Asignar categorías
   const categorias = buildCategorias(dataHeaders, tcRelIdx);
 
-  // Construir array de columnas (excluye TC y headers vacíos)
+  // Construir array de columnas.
+  // IMPORTANTE: se detiene en la columna TC — todo lo que viene después
+  // (HORAS FACTURADAS, PRODUCTIVIDAD, etc.) pertenece a otras secciones del sheet.
   const columns: FacturacionColumn[] = [];
-  dataHeaders.forEach((label, relIdx) => {
+  for (let relIdx = 0; relIdx < dataHeaders.length; relIdx++) {
     const absIdx = DATA_START + relIdx;
-    if (absIdx === tcAbsIdx) return; // TC es especial, no es columna de datos
-    if (!label) return;              // ignorar celdas vacías
+    // Al llegar a TC, cortamos — no incluimos TC ni ninguna columna posterior
+    if (absIdx === tcAbsIdx) break;
+    const label = dataHeaders[relIdx];
+    if (!label) continue; // ignorar celdas vacías intermedias
 
     columns.push({
       key: `col_${absIdx}`,
@@ -111,7 +121,7 @@ export async function getFacturacionData(): Promise<FacturacionResult> {
       categoria: categorias[relIdx],
       sheetIndex: absIdx,
     });
-  });
+  }
 
   // ── Filas de datos ───────────────────────────────────────────────────────
   const data: FacturacionRow[] = [];
