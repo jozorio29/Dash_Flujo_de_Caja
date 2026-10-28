@@ -1,17 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from 'react';
+import { PLFillHandle } from './pl-fill-handle';
+import { shiftPLFormula } from '@/lib/pl-fill';
+import { createPortal } from 'react-dom';
 import { Plus, RefreshCw } from 'lucide-react';
 import { FormulaDetailsCard } from './formula-details-card';
 import type { PLAccount, PLData } from '@/lib/pl-model';
 import { normalizeAmount } from '@/lib/pl-model';
 import { evaluateFormula } from '@/lib/pl-formula';
 import { compileFormula, displayFormula, referenceRows } from '@/lib/pl-references';
-import { calculateSummary, formatSummary, validateSummary, type SummaryRow } from '@/lib/pl-summary';
+import { calculateSummary, evaluateSummaryInput, formatSummary, validateSummary, type SummaryRow } from '@/lib/pl-summary';
 
 const button='rounded-lg border bg-card px-3 py-2 text-xs font-medium hover:bg-muted disabled:opacity-50';
-interface Props {data:PLData;year:number;currency:string;locked:boolean;onEditingChange:(editing:boolean)=>void;onNavigateReference:(account:PLAccount,month:number)=>void}
-export function PLSummaryView({data,year,currency,locked,onEditingChange,onNavigateReference}:Props) {
+interface Props {toolbarHost:HTMLDivElement|null;data:PLData;year:number;currency:string;locked:boolean;onEditingChange:(editing:boolean)=>void;onNavigateReference:(account:PLAccount,month:number)=>void}
+export function PLSummaryView({data,year,currency,locked,onEditingChange,onNavigateReference,toolbarHost}:Props) {
   const [rows,setRows]=useState<SummaryRow[]>([]);
   const [enabled,setEnabled]=useState(false);
   const [loading,setLoading]=useState(true);
@@ -97,6 +100,25 @@ export function PLSummaryView({data,year,currency,locked,onEditingChange,onNavig
       setRows(body.rows);setEdit(null);
     }catch(e){setError(e instanceof Error?e.message:'No se pudo guardar.');}finally{setSaving(false);}
   }
+  async function fillRow(row:SummaryRow,sourceMonth:number,targets:number[]) {
+    if(saving || locked || edit || !enabled || !data.canEdit)return;
+    const source=row.cells?.[`${year}:${currency}:${sourceMonth}`];
+    if(!source?.input)return;
+    const cells={...row.cells};
+    for(const month of targets)cells[`${year}:${currency}:${month}`]={...source,input:source.input.startsWith('=')?shiftPLFormula(source.input,month-sourceMonth):source.input};
+    const updated={...row,cells};
+    const proposed=rows.map(r=>r.id===row.id?updated:r);
+    validateSummary(proposed,data);
+    const results=calculateSummary(data,proposed,year,currency).get(row.id);
+    const invalid=targets.map(m=>results?.[m-1]).find(r=>r?.error);
+    if(invalid?.error)throw new Error(invalid.error);
+    setSaving(true);setError('');
+    try {
+      const response=await fetch('/api/estado-resultados/resumen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save',row:updated,previous:row.updated_at,year,currency})});
+      const body=await response.json();if(!response.ok)throw new Error(body.error || 'No se pudo rellenar.');
+      setRows(body.rows);
+    }finally{setSaving(false);}
+  }
   async function remove() {
     if(!edit?.row.updated_at || saving || locked)return;
     setSaving(true);setError('');
@@ -108,7 +130,25 @@ export function PLSummaryView({data,year,currency,locked,onEditingChange,onNavig
   }
   const input=(label:string)=><input ref={inputRef} autoFocus aria-label={label} className="w-full min-w-0 rounded border border-blue-500 bg-card px-2 py-2 text-xs text-foreground outline-none ring-1 ring-blue-500" value={draft} disabled={saving} maxLength={edit?.month===0?200:500} onChange={e=>setDraft(e.target.value)} onKeyDown={e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();void save();}if(e.key==='Escape'&&!saving){e.preventDefault();setEdit(null);setError('');}}}/>;
   const visibleRows=edit && !rows.some(r=>r.id===edit.row.id)?[...rows,edit.row]:rows;
+  let preview='';
+  let previewError='';
+  if(edit && edit.month>0 && draft.trim()) {
+    try {
+      const value=draft.trim();
+      const percent=!value.startsWith('=') && /^-?\d+(?:[.,]\d+)?%$/.test(value);
+      const amount=value.startsWith('=')?evaluateSummaryInput(compileFormula(value,accounts),data):percent?evaluateFormula(`=${value}`):normalizeAmount(value);
+      preview=formatSummary({amount},percent?'percent':'amount');
+    }catch(e){previewError=e instanceof Error?e.message:'Revisa la fórmula.';}
+  }
   return <>
+    {edit && toolbarHost && createPortal(<div className="flex flex-wrap items-center gap-3 border-b bg-blue-50 px-5 py-2 text-xs dark:bg-blue-950/40" aria-label="Edición del resumen" aria-live="polite">
+      <span>{edit.row.name || 'Nueva fila'} · {edit.month>0?['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEPT','OCT','NOV','DIC'][edit.month-1]:'Título'}</span>
+      <code className="break-all text-blue-900 dark:text-blue-200">{draft}</code>
+      {preview && <span>Resultado: {preview}</span>}
+      {(error || previewError) && <span className="text-rose-600 dark:text-rose-300">{error || previewError}</span>}
+      <button className={button} disabled={saving || locked} onClick={()=>void save()}>{saving?'Guardando…':'Guardar'}</button>
+      <button className={button} disabled={saving} onClick={()=>{setEdit(null);setError('');setConfirmDelete(false);}}>Cancelar</button>
+    </div>,toolbarHost)}
     {edit && edit.month>0 && <FormulaDetailsCard anchor={inputRef} draft={draft} rows={accounts} data={data} currency={currency} error={error} onNavigate={onNavigateReference}/>}
     <tr className="bg-muted/40"><th colSpan={14} className="border-b px-4 py-3 text-left"><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-semibold">Resumen de resultados</span><div className="flex gap-2"><button className={button} disabled={loading || saving || Boolean(edit)} onClick={()=>setRevision(r=>r+1)} aria-label="Actualizar resumen"><RefreshCw className="h-4 w-4"/></button>{data.canEdit && <button className={button} disabled={!enabled || loading || saving || locked || Boolean(edit)} onClick={add}><Plus className="mr-1 inline h-4 w-4"/>Agregar fila</button>}</div></div></th></tr>
     {loading && <tr><td colSpan={14} className="p-3 text-xs" role="status">Cargando resumen…</td></tr>}
@@ -118,7 +158,7 @@ export function PLSummaryView({data,year,currency,locked,onEditingChange,onNavig
       <th className="sticky left-0 z-10 min-w-[240px] border-b bg-card px-4 py-3 text-left text-xs font-semibold sm:min-w-[360px]">{edit?.row.id===row.id && edit.month===0?input('Título de la fila'):<button className="w-full text-left disabled:cursor-default" disabled={!data.canEdit || !enabled || locked || saving || Boolean(edit)} onClick={()=>start(row,0)}>{row.name}</button>}</th>
       {Array.from({length:12},(_,i)=>i+1).map(month=>{
         const cell=row.cells?.[`${year}:${currency}:${month}`];const result=calculated.get(row.id)?.[month-1] ?? {amount:null};
-        return <td key={month} className="border-b border-l px-2 py-2 text-right text-xs tabular-nums">{edit?.row.id===row.id && edit.month===month?input(`${row.name}, mes ${month}`):<button className="min-h-8 w-full text-right disabled:cursor-default" title={result.error || (row.cells==null?'Fórmula compartida anterior':cell?.input.startsWith('=')?displayFormula(cell.input,accounts):'Haz clic para editar')} disabled={!data.canEdit || !enabled || locked || saving || Boolean(edit)} onClick={()=>start(row,month)}>{formatSummary(result,cell?.format ?? row.format)}</button>}</td>;
+        return <td key={month} data-fill-row={`summary-${row.id}`} data-fill-month={month} className="group/fill relative border-b border-l px-2 py-2 text-right text-xs tabular-nums">{edit?.row.id===row.id && edit.month===month?input(`${row.name}, mes ${month}`):<button className="min-h-8 w-full text-right disabled:cursor-default" title={result.error || (row.cells==null?'Fórmula compartida anterior':cell?.input.startsWith('=')?displayFormula(cell.input,accounts):'Haz clic para editar')} disabled={!data.canEdit || !enabled || locked || saving || Boolean(edit)} onClick={()=>start(row,month)}>{formatSummary(result,cell?.format ?? row.format)}</button>}{cell?.input && data.canEdit && <PLFillHandle rowId={`summary-${row.id}`} month={month} disabled={saving || locked || Boolean(edit) || !enabled} occupied={m=>row.monthly_only===false || Boolean(row.cells?.[`${year}:${currency}:${m}`]?.input)} onFill={targets=>fillRow(row,month,targets)}/>}</td>;
       })}
       <td className="border-b border-l bg-muted/30 px-3 text-right text-xs font-semibold tabular-nums" title="Los porcentajes mensuales no se suman en el total anual">{formatSummary(calculated.get(row.id)?.[12] ?? {amount:null},row.format)}</td>
     </tr>)}

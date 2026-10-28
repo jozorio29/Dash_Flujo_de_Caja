@@ -1,5 +1,7 @@
 "use client";
 
+import { PLFillHandle } from "./pl-fill-handle";
+import { shiftPLFormula } from "@/lib/pl-fill";
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -73,6 +75,7 @@ function renderAmount(value: string | null) {
 export function IncomeStatementView() {
   const [year, setYear] = useState(2026);
   const [summaryEditing, setSummaryEditing] = useState(false);
+  const [summaryToolbarHost, setSummaryToolbarHost] = useState<HTMLDivElement | null>(null);
   const [currency, setCurrency] = useState("USD");
   const [data, setData] = useState<PLData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -283,6 +286,29 @@ export function IncomeStatementView() {
     return () => window.removeEventListener("beforeunload", guard);
   }, [editing, newGroup, newSubgroup, newSection, renaming]);
 
+  async function fillAccount(account:PLAccount, sourceMonth:number, targets:number[]) {
+    if(!data || !data.canEdit || saving || editing || summaryEditing)return;
+    const source=data.values.find(v=>v.account_id===account.id && v.month===sourceMonth);
+    if(!source)return;
+    const copies=targets.map(month=>({...source,month,formula:source.formula?shiftPLFormula(source.formula,month-sourceMonth):null}));
+    const proposed={...data,values:[...data.values.filter(v=>v.account_id!==account.id || !targets.includes(v.month)),...copies]};
+    const computed=recalculateValues(proposed);
+    const invalid=computed.find(v=>v.account_id===account.id && targets.includes(v.month) && v.formulaError);
+    if(invalid)throw new Error(invalid.formulaError);
+    setSaving(true);setNotice('');
+    let completed=0;
+    try {
+      for(const copy of copies) {
+        const previous=data.values.find(v=>v.account_id===account.id && v.month===copy.month)?.updated_at ?? null;
+        const response=await fetch('/api/estado-resultados',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'value',accountId:account.id,year,currency,month:copy.month,amount:copy.amount,formula:copy.formula,previous})});
+        const body=await response.json();if(!response.ok)throw new Error(body.error || 'No se pudo guardar.');
+        completed++;
+        setData(old=>{if(!old)return old;const next={...old,values:[...old.values.filter(v=>v.account_id!==account.id || v.month!==copy.month),body.value]};return {...next,values:recalculateValues(next)};});
+      }
+      setNotice(`Se rellenaron ${completed} meses.`);
+    }catch(e){throw new Error(`Se guardaron ${completed} de ${targets.length} meses. ${e instanceof Error?e.message:'Error al guardar.'} Los restantes no se modificaron.`);}
+    finally{setSaving(false);}
+  }
   async function save() {
     setFormError("");
     let payload;
@@ -850,6 +876,8 @@ export function IncomeStatementView() {
           return (
             <td
               key={label}
+              data-fill-row={account ? `account-${account.id}` : undefined}
+              data-fill-month={account ? i+1 : undefined}
               data-summary-section={sectionId}
               data-summary-month={sectionId ? i + 1 : undefined}
               style={
@@ -884,7 +912,7 @@ export function IncomeStatementView() {
                 }
               }}
               className={cn(
-                "h-10 min-w-[104px] border-b border-l border-slate-200/60 text-right text-xs tabular-nums",
+                "group/fill relative h-10 min-w-[104px] border-b border-l border-slate-200/60 text-right text-xs tabular-nums",
                 selectedReference &&
                   "bg-emerald-50 text-emerald-950 ring-2 ring-inset ring-emerald-500 outline-none dark:bg-emerald-950 dark:text-emerald-100",
               )}
@@ -1000,6 +1028,7 @@ export function IncomeStatementView() {
                   {content}
                 </span>
               )}
+              {account?.active && data?.canEdit && value && <PLFillHandle rowId={`account-${account.id}`} month={i+1} disabled={saving || Boolean(editing) || summaryEditing || Boolean(renaming) || moving} occupied={month=>Boolean(data.values.find(v=>v.account_id===account.id && v.month===month))} onFill={targets=>fillAccount(account,i+1,targets)}/>}
             </td>
           );
         })}
@@ -1341,6 +1370,7 @@ export function IncomeStatementView() {
                 : "Importes pendientes de carga"}
             </span>
           </div>
+          <div ref={setSummaryToolbarHost} />
           {editing && (
             <div
               className="flex flex-wrap items-center gap-3 border-b bg-blue-50 px-5 py-2 text-xs"
@@ -1479,6 +1509,7 @@ export function IncomeStatementView() {
                           year={year}
                           currency={currency}
                           locked={modal || saving}
+                          toolbarHost={summaryToolbarHost}
                           onEditingChange={setSummaryEditing}
                           onNavigateReference={navigateReference}
                         />

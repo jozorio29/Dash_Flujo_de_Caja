@@ -190,3 +190,19 @@ contra borrado por la migración.
 
 Las celdas de resumen sin contenido se muestran en blanco. Un cero calculado o
 cargado se mantiene como raya; no se confunde un vacío con un cero guardado.
+
+### Arrastrar para rellenar meses
+
+Guardar primero la celda con Enter. Al pasar el mouse por una celda guardada,
+el cuadrado azul de su esquina inferior derecha permite arrastrar en la misma
+fila hacia meses posteriores o anteriores. Se marca el rango y hay desplazamiento
+horizontal cerca del borde. Escape cancela el arrastre. Al soltar se pide confirmación
+si hay destinos con contenido (incluyendo ceros y fórmulas).
+
+Las referencias guardadas desplazan únicamente el mes; sus UUID y los números
+constantes permanecen iguales. No se admiten referencias fuera de enero a diciembre.
+No se implementan referencias absolutas con `$`. Los valores sin fórmula se copian.
+El resumen guarda todos los meses en una sola operación con control de versión.
+Las cuentas usan escrituras por celda con control de versión; si una falla,
+se detiene el proceso e informa cuántas se guardaron. No se revierten las anteriores.
+No requiere una migración SQL adicional.
