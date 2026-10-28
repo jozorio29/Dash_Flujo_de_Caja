@@ -103,3 +103,90 @@ sección. El orden es común a todos los años y monedas. Se guarda sort_order,
 sin modificar nombres, relaciones ni importes. Si falla la conexión, actualizar
 para consultar el orden persistido. La renumeración usa varias operaciones y
 no es transaccional: evitar reordenar simultáneamente con otro editor.
+
+## Costos de Servicios
+
+La sección `COSTOS_SERVICIOS` (orden 25) se ubica entre ingresos y egresos.
+Contiene tres grupos: Salarios Personal en Nómina, Costo Horario - Equipo Xtendo
+Shared Services y Honorarios Prestadores de Servicio Bolivia. Los editores
+pueden agregar cuentas con +; los totales se calculan con sus importes.
+No se trasladan cuentas existentes ni se transcriben montos automáticamente.
+El resultado operativo resta costos de servicios y egresos a los ingresos.
+
+Para otra base, aplicar `supabase/migrations/20261028_pl_service_costs.sql` o
+`node scripts/seed-pl-service-costs.mjs --apply`. La carga es repetible sin duplicados.
+
+## Resumen de resultados editable
+
+Ejecutar en el SQL Editor de Supabase, en este orden:
+1. `supabase/migrations/20261028_pl_summary_rows.sql`.
+2. `supabase/migrations/20261028_pl_summary_cells.sql`.
+
+Después pulsar Actualizar resumen. La interfaz verifica la disponibilidad de la
+columna mensual antes de permitir escritura. Las migraciones no cargan importes.
+
+«Agregar fila» inserta una fila vacía en la misma tabla. Escribir el título y
+pulsar Enter; después hacer clic en cada mes para cargar su valor. Enter guarda,
+Escape cancela. No se guarda al salir de una celda sin confirmar.
+
+- Número: `16751` o `16751,50`, sin separador de miles.
+- Porcentaje: `21,5%` (se almacena como 0,215).
+- Fórmula: `=B2+B3` o `=100/2`, con las mismas referencias B a M del P&L.
+- Vacío: elimina únicamente el contenido del mes editado.
+
+Los títulos y el orden son comunes a todos los años. Los valores se guardan por
+año, moneda y mes. Las referencias de fórmula apuntan a UUID de cuentas, no a su
+posición, y se recalculan al cambiar los datos de origen. No se permiten palabras
+en celdas numéricas ni referencias a otras filas del resumen en las fórmulas nuevas.
+Las fórmulas que comienzan con `=` se presentan como importes; el porcentaje se
+reconoce cuando se carga un valor literal terminado en `%`.
+
+El anual suma los importes disponibles. Si hay porcentajes en la fila, queda vacío:
+no se suman porcentajes mensuales. Las filas de resumen no forman parte de los
+totales de las secciones, evitando doble conteo.
+
+Las filas anteriores con fórmula compartida se conservan. Editar un mes crea una
+excepción únicamente para ese año/moneda/mes; los demás siguen calculándose con
+la definición anterior. Borrar esa celda la deja explícitamente vacía.
+
+Al editar el título se puede eliminar la fila, con confirmación para todos los
+períodos. Se mantienen permisos de editor, validación de origen y control de
+versión para no sobrescribir cambios simultáneos. La migración protege las cuentas
+referenciadas de borrado; aún pueden archivarse.
+
+### Ubicación dentro de la tabla
+
+La tarjeta separada se eliminó. El resumen comparte las columnas de meses y total
+anual de la tabla principal. Las filas nuevas se agregan al final del resumen. Cada título y celda se edita directamente.
+
+Después de habilitar `20261028_pl_summary_rows.sql`, ejecutar también
+`20261028_pl_results_layout.sql` en el SQL Editor de Supabase y actualizar el P&L.
+Esta segunda migración crea Egresos en impuestos y Depreciación y amortización,
+y mueve el grupo de catálogo `PL_IMPUESTOS` con sus subgrupos a la sección de
+impuestos, conservando cuentas, importes y referencias. Revisar cualquier grupo
+tributario personalizado que use otro código: no se reclasifica por coincidencia de nombre.
+
+La secuencia queda: Total egresos operativos → Impuestos y total → Depreciación y
+amortización y total → Resumen. Inversión se conserva después del resumen.
+Mientras falta esta migración, el resumen aparece después de los egresos operativos.
+Al separar impuestos, el total de Egresos operativos deja de incluirlos: revisar
+las fórmulas de resumen que referencien esa sección e incluir Impuestos donde corresponda.
+No se asignan automáticamente fórmulas contables ni se cargan importes.
+
+### Seleccionar totales azules en una fórmula de resumen
+
+Ejecutar `supabase/migrations/20261028_pl_summary_total_references.sql` si ya se
+habían aplicado las migraciones anteriores. No modifica los importes existentes.
+En una celda mensual del resumen escribir `=`, hacer clic en el importe mensual
+de un total azul, escribir `+` (u otro operador) y seleccionar otro total.
+Enter guarda y Escape cancela. Las referencias de totales aparecen numeradas
+después de las cuentas, pero se guardan con el UUID de la sección y el mes.
+Se recalculan al cambiar los valores o agregar cuentas a la sección. Un total
+sin importes aporta cero cuando se referencia en una fórmula, sin cargar ceros
+en las cuentas de origen. Un error en una cuenta se propaga al resumen.
+La selección comprende los meses de los totales de sección; el total anual no
+es una referencia seleccionable. Las secciones referenciadas quedan protegidas
+contra borrado por la migración.
+
+Las celdas de resumen sin contenido se muestran en blanco. Un cero calculado o
+cargado se mantiene como raya; no se confunde un vacío con un cero guardado.

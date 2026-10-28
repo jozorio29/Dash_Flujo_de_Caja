@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { displayAmount, type PLAccount, type PLData } from '@/lib/pl-model';
+import { displayAmount, sumAmounts, type PLAccount, type PLData } from '@/lib/pl-model';
 
 interface Props {
   anchor: RefObject<HTMLInputElement>;
@@ -45,7 +45,14 @@ export function FormulaDetailsCard({ anchor, draft, rows, data, currency, error,
     const match = /^([B-M])([1-9]\d*)$/.exec(address);
     const account = match ? rows[Number(match[2])-1] : undefined;
     const month = match ? match[1].charCodeAt(0)-65 : 0;
-    const value = account ? data.values.find(v=>v.account_id===account.id && v.month===month) : undefined;
+    let value: {amount:string;formulaError?:string} | undefined = account ? data.values.find(v=>v.account_id===account.id && v.month===month) : undefined;
+    if(account && data.sections.some(section=>section.id===account.id)) {
+      const groupIds=new Set(data.groups.filter(group=>group.section_id===account.id).map(group=>group.id));
+      const accountIds=new Set(data.accounts.filter(row=>groupIds.has(row.group_id)).map(row=>row.id));
+      const source=data.values.filter(v=>accountIds.has(v.account_id) && v.month===month);
+      const amount=sumAmounts(source.map(v=>v.amount));
+      if(amount!==null)value={amount,formulaError:source.find(v=>v.formulaError)?.formulaError};
+    }
     return {address,account,month,value};
   });
   return createPortal(<aside aria-label="Detalle de la celda en edición" className="formula-glass-card fixed z-40 overflow-auto rounded-2xl border p-3 text-xs shadow-xl backdrop-blur-xl" style={{left:position.left,top:position.top,width:position.width,maxHeight:position.height}} onMouseDown={e=>e.preventDefault()}>
