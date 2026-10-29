@@ -3,6 +3,7 @@
 import { PLFillHandle } from "./pl-fill-handle";
 import { shiftPLFormula } from "@/lib/pl-fill";
 import { usePLCellLinks } from "./pl-cell-links";
+import { PLExchangeRates } from "./pl-exchange-rates";
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -14,6 +15,7 @@ import {
   Plus,
   RefreshCw,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   displayAmount,
@@ -75,6 +77,8 @@ function renderAmount(value: string | null) {
 
 export function IncomeStatementView() {
   const [year, setYear] = useState(2026);
+  const [usdOriginal, setUsdOriginal] = useState(false);
+  const [conversionNoticeClosed, setConversionNoticeClosed] = useState(false);
   const [summaryEditing, setSummaryEditing] = useState(false);
   const [summaryToolbarHost, setSummaryToolbarHost] = useState<HTMLDivElement | null>(null);
   const [currency, setCurrency] = useState("USD");
@@ -254,7 +258,7 @@ export function IncomeStatementView() {
     setLoading(true);
     setError("");
     setData(null);
-    fetch(`/api/estado-resultados?year=${year}&currency=${currency}`, {
+    fetch(currency==='USD' && !usdOriginal ? `/api/estado-resultados/conversion?year=${year}` : `/api/estado-resultados?year=${year}&currency=${currency}`, {
       signal: controller.signal,
       cache: "no-store",
     })
@@ -274,7 +278,7 @@ export function IncomeStatementView() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [year, currency, revision]);
+  }, [year, currency, revision, usdOriginal]);
 
   useEffect(() => {
     if (!editing && !newGroup && !newSubgroup && !newSection && !renaming)
@@ -1239,20 +1243,20 @@ export function IncomeStatementView() {
     removalConfirmation ||
     groupRemovalConfirmation,
   );
-  const cellLinks = usePLCellLinks(year,currency,"account",data?.canEdit ?? false,modal || summaryEditing || saving || moving);
+  const cellLinks = usePLCellLinks(year,data?.conversion?"BOB":currency,"account",data?.canEdit ?? false,modal || summaryEditing || saving || moving);
   return (
-    <div className="space-y-3 p-4 md:p-6 lg:p-8">
+    <div className="space-y-4 px-3 pb-4 pt-4 md:px-5 md:pt-6 lg:px-6">
       {cellLinks.overlay}
-      <header className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+      <header className="flex flex-col justify-between gap-2 xl:flex-row xl:items-start">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-blue-600">
+          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-blue-600">
             <FileSpreadsheet className="h-4 w-4" />
             Reportes financieros
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Estado de Resultados
           </h1>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-slate-500">
             Europe Intelligence Solutions · Sucursal Bolivia
           </p>
         </div>
@@ -1288,19 +1292,22 @@ export function IncomeStatementView() {
                 Moneda
                 <select
                   className="mt-1 block rounded-lg border bg-white px-2 py-2 text-xs text-slate-900"
-                  value={currency}
+                  value={currency==='USD' && usdOriginal ? 'USD_LOADED' : currency}
                   disabled={modal || summaryEditing}
                   onChange={(e) => {
-                    setCurrency(e.target.value);
+                    setUsdOriginal(e.target.value==='USD_LOADED');
+                    setCurrency(e.target.value==='USD_LOADED'?'USD':e.target.value);
                     setNotice("");
                   }}
                 >
-                  <option value="USD">USD · Dólares</option>
+                  <option value="USD">USD · Convertido desde BOB</option>
+                  <option value="USD_LOADED">USD · Cargado originalmente</option>
                   <option value="BOB">BOB · Bolivianos</option>
                 </select>
               </label>
             </div>
             <div className="flex flex-wrap gap-2">
+              <PLExchangeRates year={year} disabled={loading || modal || summaryEditing || saving} onSaved={()=>{setRevision(r=>r+1);setNotice("Tipos de cambio guardados.");}}/>
               <button
                 className={button}
                 disabled={saving || moving || Boolean(renaming)}
@@ -1332,6 +1339,12 @@ export function IncomeStatementView() {
           </div>
         </div>
       </header>
+      {data?.conversion && !conversionNoticeClosed && <div className="relative rounded-lg border bg-blue-500/5 py-3 pl-4 pr-12 text-xs text-muted-foreground">
+        <button type="button" aria-label="Cerrar aviso de conversión" title="Cerrar aviso" onClick={()=>setConversionNoticeClosed(true)} className="absolute right-2 top-2 rounded-md p-1.5 hover:bg-blue-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"><X className="h-4 w-4"/></button>
+        USD calculado desde BOB con el tipo de cambio de cada mes. Para corregir importes, selecciona BOB.
+        {months.some((_,i)=>!data.conversion?.rates[i+1]) && <p className="mt-1">Sin cotización: {months.filter((_,i)=>!data.conversion?.rates[i+1]).join(', ')}. Esos meses quedan sin convertir; el total anual incluye solo los meses convertidos.</p>}
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">{months.map((m,i)=><span key={m}>{m}: {data.conversion?.rates[i+1] ? displayAmount(data.conversion.rates[i+1]) : 'Pendiente'}</span>)}</div>
+      </div>}
       {editing && data && (
         <FormulaDetailsCard
           anchor={cellInput}
@@ -1366,7 +1379,7 @@ export function IncomeStatementView() {
           className="overflow-hidden rounded-xl border bg-white shadow-sm"
           aria-label="Estado de resultados mensual"
         >
-          <div className="flex flex-wrap justify-between gap-2 border-b px-5 py-4">
+          <div className="flex flex-wrap justify-between gap-2 border-b px-4 py-3">
             <h2 className="text-sm font-semibold">P&amp;L / {year}</h2>
             <span className="text-xs text-slate-500">
               {currency} · {data.accounts.length} cuentas ·{" "}

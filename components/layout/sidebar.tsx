@@ -16,7 +16,6 @@ import {
   Sheet,
   FileSpreadsheet,
   LogOut,
-  PanelLeftClose,
   Sun,
   Moon,
 } from "lucide-react";
@@ -42,7 +41,7 @@ const NAV = [
   { href: "/movimientos", label: "Detalle de Movimientos", icon: ListChecks },
 ];
 
-export function Sidebar({ onHide }: { onHide: () => void }) {
+export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [failedImage, setFailedImage] = useState<string | null>(null);
@@ -79,7 +78,7 @@ export function Sidebar({ onHide }: { onHide: () => void }) {
   };
 
   return (
-    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col overflow-hidden border-r border-slate-800/40 bg-[#0B1B3B] text-slate-200 md:flex">
+    <aside id="app-sidebar" className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col overflow-hidden border-r border-slate-800/40 bg-[#0B1B3B] text-slate-200 md:flex">
       <div className="flex h-24 shrink-0 items-center justify-between gap-3 px-5 pt-2">
         <div className="min-w-0 flex-1">
           <div className="w-full">
@@ -92,15 +91,7 @@ export function Sidebar({ onHide }: { onHide: () => void }) {
             />
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onHide}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
-          aria-label="Ocultar menú lateral"
-          title="Ocultar menú lateral"
-        >
-          <PanelLeftClose className="h-5 w-5" />
-        </button>
+
       </div>
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-2">

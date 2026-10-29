@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { PanelLeftOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Sidebar } from "./sidebar";
-import { cn } from "@/lib/utils";
 
 /**
  * Shell que decide si renderizar el sidebar o no.
@@ -36,19 +35,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      {sidebarOpen ? <Sidebar onHide={toggleSidebar} /> : null}
-      {!sidebarOpen ? (
+      {sidebarOpen ? <Sidebar /> : null}
+      <div className="sticky top-0 hidden h-dvh w-5 shrink-0 md:block">
         <button
           type="button"
           onClick={toggleSidebar}
-          className="fixed left-4 top-4 z-40 hidden h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-md transition-colors hover:bg-slate-100 hover:text-slate-950 md:flex"
-          aria-label="Mostrar menú lateral"
-          title="Mostrar menú lateral"
+          className="flex h-full w-full items-center justify-center border-r border-border bg-muted/50 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-500"
+          aria-label={sidebarOpen ? "Ocultar menú lateral" : "Mostrar menú lateral"}
+          title={sidebarOpen ? "Ocultar menú lateral" : "Mostrar menú lateral"}
+          aria-expanded={sidebarOpen}
+          aria-controls={sidebarOpen ? "app-sidebar" : undefined}
         >
-          <PanelLeftOpen className="h-5 w-5" />
+          {sidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </button>
-      ) : null}
-      <main className={cn("flex-1 overflow-x-auto", !sidebarOpen && "md:pt-10")}>
+      </div>
+      <main className="min-w-0 flex-1 overflow-x-auto">
         {children}
       </main>
     </div>

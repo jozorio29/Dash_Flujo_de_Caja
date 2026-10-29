@@ -228,3 +228,27 @@ elimina sus metadatos de vínculo, nunca el documento externo.
 La escritura tiene validación de sesión, editor, origen, URL HTTPS y versión para
 rechazar sobrescrituras concurrentes. La tabla usa RLS sin permisos de acceso
 directo para anon/authenticated. No se modifica ningún importe o fórmula.
+
+### Tipo de cambio mensual BOB → USD
+
+Ejecutar `supabase/migrations/20261029_pl_exchange_rates.sql` en Supabase.
+El botón + junto a los controles superiores tiene el título «Agregar tipo de
+cambio». Abre un modal con los doce meses del ejercicio seleccionado; ingresar
+BOB por 1 USD (p. ej. 6,96). Solo los editores del P&L pueden guardar. Los demás
+usuarios pueden consultar. Los cambios del año se guardan en una transacción,
+con verificación de versiones por mes. Un campo vacío elimina la cotización.
+
+La opción «USD · Convertido desde BOB» divide cada importe BOB por la cotización
+de su mes. No sobrescribe ningún importe de BOB ni los USD cargados previamente.
+La opción «USD · Cargado originalmente» conserva el acceso y la edición de estos
+últimos; BOB continúa siendo editable. La vista convertida es de consulta.
+No se utiliza un tipo de cambio de otro mes ni uno fijo por defecto: faltando la
+cotización, ese mes queda sin convertir y aparece un aviso. El anual suma los
+meses convertidos disponibles, con precisión de hasta seis decimales.
+
+Las fórmulas y constantes del resumen se evalúan en BOB antes de convertir el
+resultado mensual. Los porcentajes mensuales no se convierten; el anual de filas
+con porcentajes se deja vacío, sin promediar ni sumar porcentajes. Los enlaces de
+facturas que aparecen en la vista convertida son los de las celdas originales BOB.
+El proceso no escribe importes, fórmulas ni enlaces; solo guarda las cotizaciones
+introducidas por el usuario en pl_exchange_rates.
