@@ -206,3 +206,25 @@ El resumen guarda todos los meses en una sola operación con control de versión
 Las cuentas usan escrituras por celda con control de versión; si una falla,
 se detiene el proceso e informa cuántas se guardaron. No se revierten las anteriores.
 No requiere una migración SQL adicional.
+
+### Facturas vinculadas a celdas
+
+Ejecutar `supabase/migrations/20261029_pl_cell_links.sql` en el SQL Editor y recargar
+el P&L (o usar Actualizar enlaces en el menú contextual). Requiere las tablas
+pl_accounts y pl_summary_rows de las migraciones anteriores.
+
+Clic derecho en el mes de una cuenta o una fila guardada del resumen → Insertar
+enlace → pegar la URL HTTPS de Drive → Guardar enlace. El icono de vínculo abre
+el archivo en otra pestaña. El mismo menú permite abrir, editar o quitar el enlace.
+La edición de enlaces corresponde a PL_EDITOR_EMAILS; los usuarios autorizados
+que solo consultan pueden abrir los vínculos. Los permisos de Drive no cambian.
+
+Solo se guarda URL y metadatos de cuenta/fila, año, mes, moneda y autor en
+pl_cell_links. No se descarga, copia ni sube ningún archivo a Supabase. Puede
+vincularse una factura a una celda sin importe. Borrar su importe no elimina el
+enlace y arrastrar una fórmula no copia la factura a otros meses. Eliminar la fila
+elimina sus metadatos de vínculo, nunca el documento externo.
+
+La escritura tiene validación de sesión, editor, origen, URL HTTPS y versión para
+rechazar sobrescrituras concurrentes. La tabla usa RLS sin permisos de acceso
+directo para anon/authenticated. No se modifica ningún importe o fórmula.

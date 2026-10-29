@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from 'react';
+import { usePLCellLinks } from './pl-cell-links';
 import { PLFillHandle } from './pl-fill-handle';
 import { shiftPLFormula } from '@/lib/pl-fill';
 import { createPortal } from 'react-dom';
@@ -30,6 +31,7 @@ export function PLSummaryView({data,year,currency,locked,onEditingChange,onNavig
     window.addEventListener('keydown',cancel);
     return()=>window.removeEventListener('keydown',cancel);
   },[edit,saving]);
+  const cellLinks=usePLCellLinks(year,currency,'summary',data.canEdit,locked || saving || Boolean(edit));
   const accounts=useMemo(()=>[...referenceRows(data),...data.sections.map(s=>({id:s.id,name:`Total ${s.name}`,group_id:'',code:s.code,active:false,sort_order:s.sort_order}))],[data]);
   const inputRef=useRef<HTMLInputElement>(null);
   useEffect(()=>{
@@ -141,6 +143,7 @@ export function PLSummaryView({data,year,currency,locked,onEditingChange,onNavig
     }catch(e){previewError=e instanceof Error?e.message:'Revisa la fórmula.';}
   }
   return <>
+    {cellLinks.overlay}
     {edit && toolbarHost && createPortal(<div className="flex flex-wrap items-center gap-3 border-b bg-blue-50 px-5 py-2 text-xs dark:bg-blue-950/40" aria-label="Edición del resumen" aria-live="polite">
       <span>{edit.row.name || 'Nueva fila'} · {edit.month>0?['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEPT','OCT','NOV','DIC'][edit.month-1]:'Título'}</span>
       <code className="break-all text-blue-900 dark:text-blue-200">{draft}</code>
@@ -158,7 +161,7 @@ export function PLSummaryView({data,year,currency,locked,onEditingChange,onNavig
       <th className="sticky left-0 z-10 min-w-[240px] border-b bg-card px-4 py-3 text-left text-xs font-semibold sm:min-w-[360px]">{edit?.row.id===row.id && edit.month===0?input('Título de la fila'):<button className="w-full text-left disabled:cursor-default" disabled={!data.canEdit || !enabled || locked || saving || Boolean(edit)} onClick={()=>start(row,0)}>{row.name}</button>}</th>
       {Array.from({length:12},(_,i)=>i+1).map(month=>{
         const cell=row.cells?.[`${year}:${currency}:${month}`];const result=calculated.get(row.id)?.[month-1] ?? {amount:null};
-        return <td key={month} data-fill-row={`summary-${row.id}`} data-fill-month={month} className="group/fill relative border-b border-l px-2 py-2 text-right text-xs tabular-nums">{edit?.row.id===row.id && edit.month===month?input(`${row.name}, mes ${month}`):<button className="min-h-8 w-full text-right disabled:cursor-default" title={result.error || (row.cells==null?'Fórmula compartida anterior':cell?.input.startsWith('=')?displayFormula(cell.input,accounts):'Haz clic para editar')} disabled={!data.canEdit || !enabled || locked || saving || Boolean(edit)} onClick={()=>start(row,month)}>{formatSummary(result,cell?.format ?? row.format)}</button>}{cell?.input && data.canEdit && <PLFillHandle rowId={`summary-${row.id}`} month={month} disabled={saving || locked || Boolean(edit) || !enabled} occupied={m=>row.monthly_only===false || Boolean(row.cells?.[`${year}:${currency}:${m}`]?.input)} onFill={targets=>fillRow(row,month,targets)}/>}</td>;
+        return <td key={month} onContextMenu={event=>{if(row.updated_at)cellLinks.context(event,row.id,month,row.name);}} data-fill-row={`summary-${row.id}`} data-fill-month={month} className="group/fill relative border-b border-l px-2 py-2 text-right text-xs tabular-nums">{edit?.row.id===row.id && edit.month===month?input(`${row.name}, mes ${month}`):<button className="min-h-8 w-full text-right disabled:cursor-default" title={result.error || (row.cells==null?'Fórmula compartida anterior':cell?.input.startsWith('=')?displayFormula(cell.input,accounts):'Haz clic para editar')} disabled={!data.canEdit || !enabled || locked || saving || Boolean(edit)} onClick={()=>start(row,month)}>{formatSummary(result,cell?.format ?? row.format)}</button>}{cellLinks.indicator(row.id,month,row.name)}{cell?.input && data.canEdit && <PLFillHandle rowId={`summary-${row.id}`} month={month} disabled={saving || locked || Boolean(edit) || !enabled} occupied={m=>row.monthly_only===false || Boolean(row.cells?.[`${year}:${currency}:${m}`]?.input)} onFill={targets=>fillRow(row,month,targets)}/>}</td>;
       })}
       <td className="border-b border-l bg-muted/30 px-3 text-right text-xs font-semibold tabular-nums" title="Los porcentajes mensuales no se suman en el total anual">{formatSummary(calculated.get(row.id)?.[12] ?? {amount:null},row.format)}</td>
     </tr>)}

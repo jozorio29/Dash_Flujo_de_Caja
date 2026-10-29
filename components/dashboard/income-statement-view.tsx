@@ -2,6 +2,7 @@
 
 import { PLFillHandle } from "./pl-fill-handle";
 import { shiftPLFormula } from "@/lib/pl-fill";
+import { usePLCellLinks } from "./pl-cell-links";
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -876,6 +877,7 @@ export function IncomeStatementView() {
           return (
             <td
               key={label}
+              onContextMenu={account ? event=>cellLinks.context(event,account.id,i+1,account.name) : undefined}
               data-fill-row={account ? `account-${account.id}` : undefined}
               data-fill-month={account ? i+1 : undefined}
               data-summary-section={sectionId}
@@ -1028,6 +1030,7 @@ export function IncomeStatementView() {
                   {content}
                 </span>
               )}
+              {account && cellLinks.indicator(account.id,i+1,account.name)}
               {account?.active && data?.canEdit && value && <PLFillHandle rowId={`account-${account.id}`} month={i+1} disabled={saving || Boolean(editing) || summaryEditing || Boolean(renaming) || moving} occupied={month=>Boolean(data.values.find(v=>v.account_id===account.id && v.month===month))} onFill={targets=>fillAccount(account,i+1,targets)}/>}
             </td>
           );
@@ -1236,8 +1239,10 @@ export function IncomeStatementView() {
     removalConfirmation ||
     groupRemovalConfirmation,
   );
+  const cellLinks = usePLCellLinks(year,currency,"account",data?.canEdit ?? false,modal || summaryEditing || saving || moving);
   return (
     <div className="space-y-3 p-4 md:p-6 lg:p-8">
+      {cellLinks.overlay}
       <header className="flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
         <div>
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-blue-600">
