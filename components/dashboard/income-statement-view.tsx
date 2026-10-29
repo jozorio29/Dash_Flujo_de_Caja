@@ -65,9 +65,9 @@ const firstCell =
   "sticky left-0 z-10 min-w-[240px] max-w-[240px] border-b border-slate-200 px-4 py-3 text-left text-xs sm:min-w-[360px] sm:max-w-[360px]";
 
 function renderAmount(value: string | null) {
-  if (value !== null && /^-?0+(\.0+)?$/.test(value)) {
+  if (value === null || /^-?0+(\.0+)?$/.test(value)) {
     return (
-      <span className="text-slate-300" aria-label="0">
+      <span className="pl-empty-value text-slate-500" aria-label={value === null ? "Sin datos" : "0"}>
         —
       </span>
     );
@@ -87,6 +87,8 @@ export function IncomeStatementView() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [revision, setRevision] = useState(0);
+  const [compact, setCompact] = useState(true);
+  const [totalsOnly, setTotalsOnly] = useState(false);
   const [collapsed, setCollapsed] = useState(new Set<string>());
   const [editing, setEditing] = useState<{
     account: PLAccount;
@@ -106,6 +108,7 @@ export function IncomeStatementView() {
     if (!editing && !summaryEditing) setReferenceTarget(null);
   }, [editing, summaryEditing]);
   function navigateReference(account: PLAccount, month: number) {
+    setTotalsOnly(false);
     setCollapsed((previous) => {
       const next = new Set(previous);
       let groupId: string | null = account.group_id;
@@ -1310,22 +1313,6 @@ export function IncomeStatementView() {
               <PLExchangeRates year={year} disabled={loading || modal || summaryEditing || saving} onSaved={()=>{setRevision(r=>r+1);setNotice("Tipos de cambio guardados.");}}/>
               <button
                 className={button}
-                disabled={saving || moving || Boolean(renaming)}
-                onClick={() => setCollapsed(new Set())}
-              >
-                Expandir todo
-              </button>
-              <button
-                className={button}
-                disabled={modal}
-                onClick={() =>
-                  setCollapsed(new Set(data?.groups.map((g) => g.id)))
-                }
-              >
-                Contraer todo
-              </button>
-              <button
-                className={button}
                 disabled={loading || modal || summaryEditing}
                 onClick={() => {
                   setRevision((r) => r + 1);
@@ -1376,17 +1363,36 @@ export function IncomeStatementView() {
       )}
       {data && (
         <section
-          className="overflow-hidden rounded-xl border bg-white shadow-sm"
+          className={cn("pl-insight overflow-hidden rounded-2xl border bg-white shadow-sm", compact && "pl-compact")}
           aria-label="Estado de resultados mensual"
         >
-          <div className="flex flex-wrap justify-between gap-2 border-b px-4 py-3">
-            <h2 className="text-sm font-semibold">P&amp;L / {year}</h2>
-            <span className="text-xs text-slate-500">
-              {currency} · {data.accounts.length} cuentas ·{" "}
-              {data.values.length
-                ? "Totales sobre importes cargados"
-                : "Importes pendientes de carga"}
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-sm font-semibold">P&amp;L / {year}</h2>
+              <span className="text-xs text-slate-500">{currency} · {data.accounts.length} cuentas</span>
+              <div className="flex gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800">
+                <button type="button" aria-pressed={compact} onClick={() => setCompact(v => !v)} className={cn("rounded-full px-3 py-1 text-xs transition-colors", compact ? "bg-white text-indigo-700 shadow-sm dark:bg-slate-700 dark:text-indigo-200" : "text-slate-500")}>Compacto</button>
+                <button type="button" aria-pressed={totalsOnly} disabled={modal || summaryEditing} onClick={() => setTotalsOnly(v => !v)} className={cn("rounded-full px-3 py-1 text-xs transition-colors disabled:opacity-50", totalsOnly ? "bg-white text-indigo-700 shadow-sm dark:bg-slate-700 dark:text-indigo-200" : "text-slate-500")}>Solo totales</button>
+              </div>
+            </div>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <button
+                className={button}
+                disabled={saving || moving || Boolean(renaming)}
+                onClick={() => { setTotalsOnly(false); setCollapsed(new Set()); }}
+              >
+                Expandir todo
+              </button>
+              <button
+                className={button}
+                disabled={modal}
+                onClick={() =>
+                  setCollapsed(new Set(data?.groups.map((g) => g.id)))
+                }
+              >
+                Contraer todo
+              </button>
+            </div>
           </div>
           <div ref={setSummaryToolbarHost} />
           {editing && (
@@ -1467,7 +1473,8 @@ export function IncomeStatementView() {
                   );
                   return (
                     <Fragment key={section.id}>
-                      <tr className={tones[section.code] || "bg-blue-50"}>
+                      {!totalsOnly && <>
+                      <tr className="pl-section" data-tone={section.code}>
                         <th
                           className={cn(
                             firstCell,
@@ -1475,7 +1482,7 @@ export function IncomeStatementView() {
                             tones[section.code] || "bg-blue-50",
                           )}
                         >
-                          <span className="group/section flex items-center justify-between gap-2">
+                          <span className="pl-section-label group/section flex items-center justify-between gap-2">
                             {editableName("sections", section)}
                             {data.canEdit && (
                               <button
@@ -1500,7 +1507,7 @@ export function IncomeStatementView() {
                             )}
                           </span>
                         </th>
-                        {cells([])}
+                        {Array.from({ length: 13 }, (_, index) => <td key={index} />)}
                       </tr>
                       {groups
                         .filter((g) => !g.parent_id)
@@ -1515,7 +1522,8 @@ export function IncomeStatementView() {
                           </td>
                         </tr>
                       )}
-                      <tr className="bg-[#193D6B] text-white">
+                      </>}
+                      <tr className="pl-total" data-tone={section.code}>
                         <th className={cn(firstCell, "bg-[#193D6B]")}>
                           Total {section.name.toLowerCase()}
                         </th>
@@ -1533,7 +1541,7 @@ export function IncomeStatementView() {
                         />
                       )}
                       <tr aria-hidden="true">
-                        <td colSpan={14} className="h-5" />
+                        <td colSpan={14} className={totalsOnly ? "h-1" : "h-2"} />
                       </tr>
                     </Fragment>
                   );
