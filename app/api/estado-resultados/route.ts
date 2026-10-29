@@ -85,8 +85,18 @@ export async function POST(request: Request) {
       const values = await plRequest<Array<{ id: string }>>('pl_monthly_values', `select=id&account_id=eq.${body.id}&limit=1`);
       const referenced = await hasFormulaReferences(body.id);
       if (body.action === 'remove-check') return NextResponse.json({ hasValues: values.length > 0 || referenced, name: accounts[0].name });
-      if (body.action === 'delete-account' && referenced) return error('Una fórmula utiliza esta cuenta. Archívala para conservar la referencia.', 409);
-      if (body.action === 'delete-account' && values.length) return error('Esta cuenta tiene importes. Debes archivarla para conservarlos.', 409);
+      if (body.action === 'delete-account' && referenced) return error('Una fórmula utiliza esta cuenta. Quita esa referencia antes de eliminarla.', 409);
+      if (body.action === 'delete-account') {
+        try {
+          const rows = await plRequest<PLAccount[]>('rpc/delete_pl_account', '', { method: 'POST', body: JSON.stringify({p_id:body.id}) });
+          if (!rows.length) return error('La cuenta ya no existe. Actualiza los datos.', 409);
+          return NextResponse.json({archived:false,account:rows[0]});
+        } catch (e) {
+          if (e instanceof PLStoreError && e.status === 404) return error('Ejecuta 20261029_pl_delete_account.sql en Supabase para habilitar la eliminación.', 503);
+          if (e instanceof PLStoreError && e.status === 409) return error('No se eliminó: una fórmula o fila de resumen utiliza esta cuenta. Revisa sus referencias.', 409);
+          throw e;
+        }
+      }
       const rows = await plRequest<PLAccount[]>('pl_accounts', `id=eq.${body.id}&select=*`, {
         method: body.action === 'delete-account' ? 'DELETE' : 'PATCH',
         headers: { Prefer: 'return=representation' },

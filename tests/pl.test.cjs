@@ -199,3 +199,17 @@ test('API calcula la fórmula en servidor y elimina fórmula al reemplazarla por
   assert(!('formula' in JSON.parse(calls[1].init.body)));
   formulasEnabled = true;
 });
+
+test('eliminar cuenta con importes utiliza una única operación transaccional', async () => {
+  session = {user:{email:'editor@example.com'}}; editor = true;
+  calls = []; responseRows = [{id:account}]; formulasEnabled = false;
+  try {
+    const response = await routes.POST(request({action:'delete-account',id:account}));
+    assert.equal(response.status,200);
+    assert.equal((await response.json()).archived,false);
+    const mutation = calls.find(call => call.table === 'rpc/delete_pl_account');
+    assert.deepEqual(JSON.parse(mutation.init.body),{p_id:account});
+    assert.equal(calls.filter(call => call.init?.method === 'POST').length,1);
+    assert(!calls.some(call => call.init?.method === 'DELETE'));
+  } finally { formulasEnabled = true; }
+});

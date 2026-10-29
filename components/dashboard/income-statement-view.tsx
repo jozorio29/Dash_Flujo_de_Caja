@@ -497,9 +497,7 @@ export function IncomeStatementView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: removalConfirmation.hasValues
-            ? "archive-account"
-            : "delete-account",
+          action: "delete-account",
           id: removalConfirmation.id,
         }),
       });
@@ -510,6 +508,7 @@ export function IncomeStatementView() {
         previous
           ? {
               ...previous,
+              values: previous.values.filter(v => v.account_id !== removalConfirmation.id),
               accounts: result.archived
                 ? previous.accounts.map((a) =>
                     a.id === removalConfirmation.id
@@ -1216,8 +1215,7 @@ export function IncomeStatementView() {
                   {dragHandle("accounts", account)}
                   <span className="group/account-row inline-flex w-full items-center justify-between gap-2">
                     {editableName("accounts", account)}
-                    {account.active &&
-                      data.canEdit &&
+                    {data.canEdit &&
                       !(
                         renaming?.kind === "accounts" &&
                         renaming.id === account.id
@@ -1753,9 +1751,7 @@ export function IncomeStatementView() {
                   id="remove-title"
                   className="text-lg font-semibold text-slate-900"
                 >
-                  {removalConfirmation.hasValues
-                    ? "¿Archivar esta cuenta?"
-                    : "¿Eliminar esta fila?"}
+                  ¿Eliminar esta cuenta?
                 </h2>
                 <p
                   id="remove-description"
@@ -1767,8 +1763,7 @@ export function IncomeStatementView() {
                       <strong className="font-semibold text-slate-900">
                         «{removalConfirmation.name}»
                       </strong>{" "}
-                      tiene importes guardados. Se conservarán en los informes
-                      históricos, pero la cuenta no podrá recibir nuevas cargas.
+                      se eliminará junto con sus importes de todos los años y monedas y sus enlaces a facturas. Los archivos de Drive se conservan. Esta acción no se puede deshacer.
                     </>
                   ) : (
                     <>
@@ -1800,9 +1795,7 @@ export function IncomeStatementView() {
               >
                 {saving
                   ? "Procesando…"
-                  : removalConfirmation.hasValues
-                    ? "Sí, archivar"
-                    : "Sí, eliminar"}
+                  : "Sí, eliminar"}
               </button>
             </div>
           </div>
