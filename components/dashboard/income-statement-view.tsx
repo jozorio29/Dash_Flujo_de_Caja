@@ -14,6 +14,7 @@ import {
   GripVertical,
   Plus,
   RefreshCw,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
@@ -89,6 +90,37 @@ export function IncomeStatementView() {
   const [revision, setRevision] = useState(0);
   const [compact, setCompact] = useState(true);
   const [totalsOnly, setTotalsOnly] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchTarget, setSearchTarget] = useState<string | null>(null);
+  const searchButton = useRef<HTMLButtonElement>(null);
+  const normalizeSearch = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const searchResults = (data?.accounts || []).filter(account =>
+    (account.active || data?.values.some(value => value.account_id === account.id)) &&
+    normalizeSearch(account.name).includes(normalizeSearch(searchQuery))
+  );
+  useEffect(() => {
+    if (!searchTarget) return;
+    const target = document.getElementById(`pl-account-${searchTarget}`);
+    target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    target?.focus({ preventScroll: true });
+  }, [searchTarget]);
+  function selectSearchResult(account: PLAccount) {
+    setTotalsOnly(false);
+    setCollapsed(previous => {
+      const next = new Set(previous);
+      let id: string | null = account.group_id;
+      const visited = new Set<string>();
+      while (id && !visited.has(id)) {
+        visited.add(id);
+        next.delete(id);
+        id = data?.groups.find(group => group.id === id)?.parent_id || null;
+      }
+      return next;
+    });
+    setSearchTarget(account.id);
+    setSearchOpen(false);
+  }
   const [collapsed, setCollapsed] = useState(new Set<string>());
   const [editing, setEditing] = useState<{
     account: PLAccount;
@@ -1164,11 +1196,14 @@ export function IncomeStatementView() {
             {accounts.map((account) => (
               <tr
                 key={account.id}
+                data-search-match={searchTarget === account.id || undefined}
                 {...dropProps("accounts", account.id)}
                 className="hover:bg-blue-50/40"
               >
                 <th
                   scope="row"
+                  id={`pl-account-${account.id}`}
+                  tabIndex={-1}
                   className={cn(
                     firstCell,
                     "bg-white font-normal text-slate-600",
@@ -1392,8 +1427,24 @@ export function IncomeStatementView() {
               >
                 Contraer todo
               </button>
+              <button ref={searchButton} type="button" className={button} title="Buscar cuenta" aria-label="Buscar cuenta" aria-expanded={searchOpen} aria-controls="pl-account-search" disabled={modal || summaryEditing} onClick={() => {setSearchOpen(v => !v); setSearchTarget(null);}}><Search className="h-4 w-4" /></button>
             </div>
           </div>
+          {searchOpen && <div id="pl-account-search" className="border-b bg-slate-50/70 px-4 py-3 dark:bg-slate-900/50" onKeyDown={event => {if(event.key === "Escape") {event.stopPropagation(); setSearchOpen(false); searchButton.current?.focus();}}}>
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+              <input autoFocus type="search" aria-label="Nombre de la cuenta" placeholder="Buscar cuenta…" value={searchQuery} onChange={event => {setSearchQuery(event.target.value); setSearchTarget(null);}} onKeyDown={event => {if(event.key === "Enter" && searchQuery.trim() && searchResults[0]) {event.preventDefault(); selectSearchResult(searchResults[0]);}}} className="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm dark:bg-slate-800" />
+              <button type="button" className={button} aria-label="Cerrar búsqueda" onClick={() => {setSearchOpen(false); searchButton.current?.focus();}}><X className="h-4 w-4" /></button>
+            </div>
+            {searchQuery.trim() && <>
+              <p role="status" className="mt-2 text-xs text-slate-500">{searchResults.length ? `${searchResults.length} coincidencias` : "No se encontraron cuentas."}</p>
+              <div className="mt-1 max-h-48 overflow-y-auto">
+                {searchResults.map(account => <button key={account.id} type="button" onClick={() => selectSearchResult(account)} className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-xs hover:bg-indigo-50 focus-visible:bg-indigo-50 dark:hover:bg-slate-800 dark:focus-visible:bg-slate-800">
+                  <span>{account.name}</span><span className="text-slate-500">{data.groups.find(group => group.id === account.group_id)?.name}</span>
+                </button>)}
+              </div>
+            </>}
+          </div>}
           <div ref={setSummaryToolbarHost} />
           {editing && (
             <div

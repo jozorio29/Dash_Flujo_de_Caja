@@ -179,3 +179,6 @@
 .pl-insight.pl-compact table td > input { min-width: 80px; height: 30px; padding-left: 8px; padding-right: 8px; }
 .pl-insight.pl-compact table tr[aria-hidden] td { height: 6px; padding: 0; }
 .pl-insight .pl-total .pl-empty-value { color: inherit; }
+.pl-insight table tr[data-search-match] > th, .pl-insight table tr[data-search-match] > td { background-color: #eef2ff; }
+.dark .pl-insight table tr[data-search-match] > th, .dark .pl-insight table tr[data-search-match] > td { background-color: #252847; }
+.pl-insight table tr[data-search-match] > th { box-shadow: inset 3px 0 #6366f1; }
