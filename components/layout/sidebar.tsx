@@ -7,8 +7,8 @@ import { signOut, useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   TrendingUp,
-  TrendingDown,
-  Tags,
+  Clock,
+  Gauge,
   CalendarRange,
   ListChecks,
   UserCircle,
@@ -35,8 +35,8 @@ const NAV = [
     icon: FileSpreadsheet,
   },
   { href: "/facturacion", label: "Facturación", icon: TrendingUp },
-  { href: "/egresos", label: "Egresos", icon: TrendingDown },
-  { href: "/categorias", label: "Categorías", icon: Tags },
+  { href: "/horas", label: "Horas", icon: Clock },
+  { href: "/indicadores", label: "Indicadores", icon: Gauge },
   { href: "/diario", label: "Análisis Diario", icon: CalendarRange },
   { href: "/movimientos", label: "Detalle de Movimientos", icon: ListChecks },
 ];
