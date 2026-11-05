@@ -122,6 +122,10 @@ export function PLBaseView() {
 
   const yy = year ? String(year).slice(-2) : "";
   let sectionCount = -1;
+  // Letra de columna del Sheet para cada mes y el total ("Q", "R", … "AC").
+  const columnLetters = year
+    ? (rows.find((r) => r.cells[year]?.length)?.cells[year] ?? []).map((c) => c.address.replace(/\d+$/, ""))
+    : [];
 
   function toggle(i: number) {
     setCollapsed((current) => {
@@ -284,12 +288,14 @@ export function PLBaseView() {
               <thead className="sticky top-0 z-20 bg-white">
                 <tr>
                   <th className={cn(firstCell, "z-30 bg-white font-semibold text-slate-600")}>Concepto / Cuenta</th>
-                  {MONTHS.map((m) => (
-                    <th key={m} className="border-b border-slate-200 bg-white px-3 py-2.5 text-right text-xs font-semibold tracking-wider text-slate-600">
+                  {MONTHS.map((m, i) => (
+                    <th key={m} className="border-b border-slate-200 bg-white px-3 py-2 text-right text-xs font-semibold tracking-wider text-slate-600">
+                      <span className="block text-[10px] font-normal tracking-normal text-slate-400">{columnLetters[i]}</span>
                       {m}-{yy}
                     </th>
                   ))}
-                  <th className="border-b border-l border-slate-200 bg-white px-3 py-2.5 text-right text-xs font-semibold text-slate-600">
+                  <th className="border-b border-l border-slate-200 bg-white px-3 py-2 text-right text-xs font-semibold text-slate-600">
+                    <span className="block text-[10px] font-normal text-slate-400">{columnLetters[12]}</span>
                     TOTAL {year}
                   </th>
                 </tr>
@@ -302,7 +308,7 @@ export function PLBaseView() {
                     return (
                       <tr key={key}>
                         <th colSpan={14} className="border-b border-slate-200 bg-white px-4 pb-2 pt-5 text-left">
-                          <span className={cn("rounded-full px-3 py-1.5 text-xs font-semibold", SECTION_TONES[sectionCount % SECTION_TONES.length])}>
+                          <span className={cn("sticky left-4 rounded-full px-3 py-1.5 text-xs font-semibold", SECTION_TONES[sectionCount % SECTION_TONES.length])}>
                             {row.label}
                           </span>
                         </th>
@@ -327,9 +333,12 @@ export function PLBaseView() {
                           strong ? "bg-blue-50" : isGroup ? "bg-slate-50" : "bg-white font-normal text-slate-600",
                           row.kind === "detail" && "text-[11px]"
                         )}
-                        style={{ paddingLeft: 16 + row.level * 16 }}
+                        style={{ paddingLeft: 36 + row.level * 16 }}
                         title={`Fila ${row.row} del Sheet`}
                       >
+                        <span className="absolute left-2 top-1/2 w-6 -translate-y-1/2 text-right text-[10px] font-normal not-italic tabular-nums text-slate-400">
+                          {row.row}
+                        </span>
                         {isGroup ? (
                           <button type="button" className="inline-flex items-center gap-1 text-left" onClick={() => toggle(i)} aria-expanded={!collapsed.has(i)}>
                             {collapsed.has(i) ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
