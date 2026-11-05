@@ -128,3 +128,56 @@ export async function fetchSheetValues(
   const data = (await res.json()) as SheetsResponse;
   return data.values || [];
 }
+
+/** Celda de la API de Sheets (solo los campos que se piden en fetchSheetGrid). */
+export interface GridCell {
+  formattedValue?: string;
+  effectiveValue?: { numberValue?: number; stringValue?: string; boolValue?: boolean };
+  userEnteredValue?: { formulaValue?: string; numberValue?: number; stringValue?: string };
+  effectiveFormat?: {
+    backgroundColor?: { red?: number; green?: number; blue?: number };
+    textFormat?: { bold?: boolean };
+  };
+}
+
+/**
+ * Lee un rango con valor calculado, texto mostrado, fórmula y formato de cada
+ * celda en una sola llamada. Requiere la cuenta de servicio (la API key no
+ * alcanza para planillas privadas).
+ */
+export async function fetchSheetGrid(
+  spreadsheetId: string,
+  range: string,
+  { withFormat = false }: { withFormat?: boolean } = {}
+): Promise<GridCell[][]> {
+  const accessToken = await getServiceAccountAccessToken();
+  if (!accessToken) {
+    throw new Error(
+      "Configura GOOGLE_SERVICE_ACCOUNT_EMAIL y GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY"
+    );
+  }
+  const query = new URLSearchParams({
+    ranges: range,
+    // El formato pesa mucho por celda: pedirlo solo donde hace falta.
+    fields: withFormat
+      ? "sheets.data.rowData.values(formattedValue,effectiveFormat(backgroundColor,textFormat.bold))"
+      : "sheets.data.rowData.values(formattedValue,effectiveValue,userEnteredValue.formulaValue)",
+  });
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
+      spreadsheetId
+    )}?${query.toString()}`,
+    { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" }
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(
+      `Google Sheets API error ${res.status}: ${body} Comparte la planilla como Lector con GOOGLE_SERVICE_ACCOUNT_EMAIL.`
+    );
+  }
+  const data = (await res.json()) as {
+    sheets?: { data?: { rowData?: { values?: GridCell[] }[] }[] }[];
+  };
+  const rows = data.sheets?.[0]?.data?.[0]?.rowData || [];
+  return rows.map((r) => r.values || []);
+}

@@ -30,8 +30,13 @@ const NAV = [
     icon: TableProperties,
   },
   {
-    href: "/estado-resultados",
+    href: "/estado-resultados-base",
     label: "Estado de Resultados",
+    icon: FileSpreadsheet,
+  },
+  {
+    href: "/estado-resultados",
+    label: "Estado de Resultados (Supabase)",
     icon: FileSpreadsheet,
   },
   { href: "/facturacion", label: "Facturación", icon: TrendingUp },

@@ -1290,7 +1290,7 @@ export function IncomeStatementView() {
             Reportes financieros
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Estado de Resultados
+            Estado de Resultados (Supabase)
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             Europe Intelligence Solutions · Sucursal Bolivia

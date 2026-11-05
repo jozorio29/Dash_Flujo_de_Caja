@@ -12,6 +12,15 @@ import {
   type SeriesColumn,
   type SeriesGroup,
 } from "./pl-sheet";
+import {
+  facturacionSpecs,
+  findHeaderRow,
+  findYearBlocks,
+  horasSpecs,
+  indicadoresSpecs,
+  monthlyRows,
+} from "./pl-base-sheet";
+import { plBaseConfig, readPLBaseGrid } from "./pl-base-store";
 
 export interface SeriesResult {
   columns: SeriesColumn[];
@@ -43,8 +52,26 @@ function requireTC(headers: string[]): number {
   return tcIdx;
 }
 
+/**
+ * Con PL_BASE_SPREADSHEET_ID configurado, los tres módulos leen directo el P&L
+ * horizontal de la contadora. Sin esa variable siguen usando la pestaña P&L
+ * vertical (la que arma el script), como antes.
+ */
+async function readBase() {
+  if (!plBaseConfig()) return null;
+  const grid = await readPLBaseGrid();
+  const headerRow = findHeaderRow(grid);
+  if (headerRow < 0) throw new Error("No se encontró la fila de meses en el P&L de la contadora.");
+  return { grid, blocks: findYearBlocks(grid, headerRow) };
+}
+
 /** Facturación: columnas desde C hasta antes de TC PARALELO. */
 export async function getFacturacionData(): Promise<SeriesResult> {
+  const base = await readBase();
+  if (base) {
+    const columns = facturacionSpecs(base.grid);
+    return { columns, groups: FACTURACION_GROUPS, data: monthlyRows(base.grid, base.blocks, columns) };
+  }
   const sheet = await readPL();
   if (!sheet) return { columns: [], groups: FACTURACION_GROUPS, data: [] };
   const tcIdx = requireTC(sheet.headers);
@@ -54,6 +81,11 @@ export async function getFacturacionData(): Promise<SeriesResult> {
 
 /** Horas: columnas "HORAS FACTURADAS …" ubicadas después de TC PARALELO. */
 export async function getHorasData(): Promise<SeriesResult> {
+  const base = await readBase();
+  if (base) {
+    const { columns, groups } = horasSpecs(base.grid);
+    return { columns, groups, data: monthlyRows(base.grid, base.blocks, columns) };
+  }
   const sheet = await readPL();
   if (!sheet) return { columns: [], groups: [], data: [] };
   const tcIdx = requireTC(sheet.headers);
@@ -63,6 +95,11 @@ export async function getHorasData(): Promise<SeriesResult> {
 
 /** Indicadores: desde "Total Ingresos Operativos" en adelante. */
 export async function getIndicadoresData(): Promise<IndicadoresResult> {
+  const base = await readBase();
+  if (base) {
+    const columns = indicadoresSpecs(base.grid);
+    return { columns, data: monthlyRows(base.grid, base.blocks, columns) };
+  }
   const sheet = await readPL();
   if (!sheet) return { columns: [], data: [] };
   const columns = selectIndicadoresColumns(sheet.headers);
