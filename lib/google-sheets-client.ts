@@ -13,7 +13,10 @@ interface GoogleTokenResponse {
   error_description?: string;
 }
 
-let cachedAccessToken: { value: string; expiresAt: number } | null = null;
+const READ_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
+const WRITE_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+/** Un token por permiso: las lecturas siguen usando solo lectura. */
+const cachedAccessTokens = new Map<string, { value: string; expiresAt: number }>();
 
 function base64Url(value: string | Buffer): string {
   return Buffer.from(value)
@@ -34,20 +37,21 @@ function getServiceAccountCredentials() {
   return { clientEmail, privateKey };
 }
 
-async function getServiceAccountAccessToken(): Promise<string | null> {
+async function getServiceAccountAccessToken(scope = READ_SCOPE): Promise<string | null> {
   const credentials = getServiceAccountCredentials();
   if (!credentials) return null;
 
   const now = Math.floor(Date.now() / 1000);
-  if (cachedAccessToken && cachedAccessToken.expiresAt > now + 60) {
-    return cachedAccessToken.value;
+  const cached = cachedAccessTokens.get(scope);
+  if (cached && cached.expiresAt > now + 60) {
+    return cached.value;
   }
 
   const header = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const payload = base64Url(
     JSON.stringify({
       iss: credentials.clientEmail,
-      scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
+      scope,
       aud: "https://oauth2.googleapis.com/token",
       iat: now,
       exp: now + 3600,
@@ -77,11 +81,11 @@ async function getServiceAccountAccessToken(): Promise<string | null> {
     throw new Error(`No se pudo autenticar la cuenta de servicio: ${detail}`);
   }
 
-  cachedAccessToken = {
+  cachedAccessTokens.set(scope, {
     value: tokenData.access_token,
     expiresAt: now + (tokenData.expires_in || 3600),
-  };
-  return cachedAccessToken.value;
+  });
+  return tokenData.access_token;
 }
 
 /**
@@ -180,4 +184,79 @@ export async function fetchSheetGrid(
   };
   const rows = data.sheets?.[0]?.data?.[0]?.rowData || [];
   return rows.map((r) => r.values || []);
+}
+
+// ─── Escritura (requiere la cuenta de servicio como Editor) ───────────────────
+
+async function writeRequest<T>(spreadsheetId: string, path: string, init: RequestInit): Promise<T> {
+  const accessToken = await getServiceAccountAccessToken(WRITE_SCOPE);
+  if (!accessToken) {
+    throw new Error("Configura GOOGLE_SERVICE_ACCOUNT_EMAIL y GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY");
+  }
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}${path}`,
+    {
+      ...init,
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      cache: "no-store",
+    }
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    const hint =
+      res.status === 403
+        ? " La cuenta de servicio necesita ser Editor del Sheet y estar incluida en la protección de la pestaña."
+        : "";
+    throw new Error(`Google Sheets API error ${res.status}: ${body}${hint}`);
+  }
+  return (await res.json()) as T;
+}
+
+/**
+ * Escribe una celda como si se tecleara en el Sheet (USER_ENTERED): respeta la
+ * configuración regional del documento (coma decimal, ";" en fórmulas).
+ */
+export async function writeSheetCell(spreadsheetId: string, a1: string, input: string): Promise<void> {
+  const query = new URLSearchParams({ valueInputOption: "USER_ENTERED" });
+  await writeRequest(spreadsheetId, `/values/${encodeURIComponent(a1)}?${query.toString()}`, {
+    method: "PUT",
+    body: JSON.stringify({ range: a1, majorDimension: "ROWS", values: [[input]] }),
+  });
+}
+
+/** Crea la pestaña si no existe (por ejemplo, el registro oculto de cambios). */
+export async function ensureSheet(
+  spreadsheetId: string,
+  title: string,
+  { hidden = false, headers = [] as string[] } = {}
+): Promise<void> {
+  const accessToken = await getServiceAccountAccessToken(WRITE_SCOPE);
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties.title`,
+    { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" }
+  );
+  if (!res.ok) throw new Error(`Google Sheets API error ${res.status}: ${await res.text()}`);
+  const data = (await res.json()) as { sheets?: { properties: { title: string } }[] };
+  if (data.sheets?.some((s) => s.properties.title === title)) return;
+  try {
+    await writeRequest(spreadsheetId, ":batchUpdate", {
+      method: "POST",
+      body: JSON.stringify({ requests: [{ addSheet: { properties: { title, hidden } } }] }),
+    });
+  } catch (error) {
+    // Otro guardado simultáneo pudo haberla creado primero.
+    if (!/already exists|ya existe/i.test((error as Error).message)) throw error;
+    return;
+  }
+  if (headers.length) await appendSheetRow(spreadsheetId, title, headers);
+}
+
+/** Agrega una fila al final de una pestaña. RAW: guarda el texto tal cual (una fórmula queda como texto). */
+export async function appendSheetRow(spreadsheetId: string, title: string, values: string[]): Promise<void> {
+  const range = `'${title.replace(/'/g, "''")}'!A:A`;
+  const query = new URLSearchParams({ valueInputOption: "RAW", insertDataOption: "INSERT_ROWS" });
+  await writeRequest(spreadsheetId, `/values/${encodeURIComponent(range)}:append?${query.toString()}`, {
+    method: "POST",
+    body: JSON.stringify({ majorDimension: "ROWS", values: [values] }),
+  });
 }

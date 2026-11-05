@@ -125,3 +125,41 @@ test('fórmulas de suma y letras de columna', () => {
   for (const f of ['=Q63*Q64', "=VLOOKUP(C$12;'Cotizacion Dolar'!$B:$D;2;FALSE)", '=C293-(C283+C282)', '=30955,62/Q13']) assert.equal(P.isSumFormula(f), false, f);
   assert.deepEqual([0, 1, 25, 26, 27, 28].map(P.columnLetter), ['A', 'B', 'Z', 'AA', 'AB', 'AC']);
 });
+
+test('valida lo que se escribe en una celda (configuración española)', () => {
+  for (const ok of ['1234', '-1234,50', '12,5%', '=30955,62/Q13', "=VLOOKUP(Q$12;'Cotizacion Dolar'!$G:$I;2;FALSE)", '']) {
+    assert.equal(P.validateCellInput(` ${ok} `), ok);
+  }
+  assert.throws(() => P.validateCellInput('1234.50'), /coma/);
+  assert.throws(() => P.validateCellInput('1.234,50'), /número/);
+  assert.throws(() => P.validateCellInput('hola'), /número/);
+  assert.throws(() => P.validateCellInput('=IMPORTRANGE("x";"A1")'), /externos/);
+  assert.equal(P.editableText({ text: '1.234', value: 1234.5, formula: null, address: 'Q6' }), '1234,5');
+  assert.equal(P.editableText({ text: '9', value: 9, formula: '=C6+1', address: 'Q6' }), '=C6+1');
+});
+
+test('solo se editan cuentas sin cambios desde la lectura', () => {
+  const st = P.buildStatement(grid());
+  const base = { row: 6, address: 'Q6', label: 'TIGO Bolivia (e-care)', formula: '=(1000+0)/C4', value: 100 };
+  assert.equal(P.findEditableCell(st, base).cell.address, 'Q6');
+  assert.throws(() => P.findEditableCell(st, { ...base, label: 'Otra cuenta' }), /filas del Sheet cambiaron/);
+  assert.throws(() => P.findEditableCell(st, { ...base, formula: '=1' }), /cambió en el Sheet/);
+  assert.throws(() => P.findEditableCell(st, { ...base, address: 'AC6' }), /total anual/);
+  assert.throws(() => P.findEditableCell(st, { row: 8, address: 'Q8', label: 'Total Ingresos Operativos', formula: '=SUM(C6:C7)', value: 150 }), /calcula el Sheet/);
+  const literal = { row: 7, address: 'R7', label: 'Alquiler de Posiciones de trabajo - Tupperware', formula: null, value: 50 };
+  assert.equal(P.findEditableCell(st, literal).cell.address, 'R7');
+  assert.throws(() => P.findEditableCell(st, { ...literal, value: 49 }), /cambió en el Sheet/);
+});
+
+test('fila del registro de cambios (Log Portal)', () => {
+  const when = new Date(Date.UTC(2026, 10, 5, 18, 30, 15));
+  const row = P.logRow({ email: 'a@x.com', address: 'S15', row: 15, year: 2026, month: 3, before: '=30955,62/Q13', after: '' }, when);
+  assert.equal(row.length, P.LOG_HEADERS.length);
+  assert.match(row[0], /^05\/11\/2026,? 14:30:15$/);
+  assert.deepEqual(row.slice(1), ['America/La_Paz', 'a@x.com', 'S15', '15', 'MAR-26', '=30955,62/Q13', '(vacío)']);
+  // Misma hora del servidor, mostrada en la zona del usuario.
+  const madrid = P.logRow({ email: 'a@x.com', address: 'S15', row: 15, year: 2026, month: 3, before: '1', after: '2' }, when, 'Europe/Madrid');
+  assert.match(madrid[0], /^05\/11\/2026,? 19:30:15$/);
+  assert.equal(madrid[1], 'Europe/Madrid');
+  for (const bad of ['Marte/Olympus', '../../etc', '', 42, null]) assert.equal(P.safeTimeZone(bad), 'America/La_Paz');
+});

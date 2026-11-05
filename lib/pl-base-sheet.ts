@@ -364,3 +364,129 @@ export function buildStatement(grid: GridCell[][]): Statement {
 
   return { years: blocks.map((b) => b.year), rows };
 }
+
+// ─── Edición ──────────────────────────────────────────────────────────────────
+
+/** Tipos de fila que se cargan a mano. Totales, grupos, resultados y el TC los calcula el Sheet. */
+export const EDITABLE_KINDS: StatementKind[] = ["account", "detail"];
+
+/**
+ * Valida lo que se escribe en una celda. El Sheet está en configuración
+ * española: coma decimal y ";" entre argumentos de fórmulas.
+ * Devuelve el texto a enviar ("" = vaciar la celda).
+ */
+export function validateCellInput(raw: string): string {
+  const input = raw.trim();
+  if (input === "") return "";
+  if (input.length > 1000) throw new Error("La fórmula es demasiado larga.");
+  if (input.startsWith("=")) {
+    if (/\bIMPORT(RANGE|XML|HTML|DATA|FEED)\s*\(/i.test(input)) {
+      throw new Error("No se permiten fórmulas que importen datos externos.");
+    }
+    return input;
+  }
+  if (/^-?\d+(,\d+)?%?$/.test(input)) return input;
+  if (/^-?\d+\.\d+$/.test(input)) throw new Error("Usa coma para los decimales, como en el Sheet (ej. 1234,50).");
+  throw new Error("Escribe un número sin separador de miles (ej. 1234,50) o una fórmula que empiece con =.");
+}
+
+/** Texto para editar una celda: su fórmula o su número con coma decimal. */
+export function editableText(cell: StatementCell): string {
+  if (cell.formula) return cell.formula;
+  if (cell.value === null) return "";
+  return String(cell.value).replace(".", ",");
+}
+
+/**
+ * Busca la celda a editar en el estado actual del Sheet y comprueba que siga
+ * siendo la misma cuenta y que nadie la haya cambiado desde que se leyó.
+ */
+export function findEditableCell(
+  statement: Statement,
+  target: { row: number; address: string; label: string; formula: string | null; value: number | null }
+): { row: StatementRow; cell: StatementCell; year: number; month: number } {
+  const row = statement.rows.find((r) => r.row === target.row && r.kind !== "section");
+  if (!row || plain(row.label) !== plain(target.label)) {
+    throw new Error("Las filas del Sheet cambiaron (alguien insertó o movió filas). Actualiza e intenta de nuevo.");
+  }
+  if (!EDITABLE_KINDS.includes(row.kind)) throw new Error("Esta fila la calcula el Sheet y no se edita desde el portal.");
+  for (const year of statement.years) {
+    const m = row.cells[year].findIndex((c) => c.address === target.address);
+    if (m === 12) throw new Error("El total anual lo calcula el Sheet.");
+    if (m >= 0) {
+      const cell = row.cells[year][m];
+      const sameFormula = (cell.formula ?? null) === (target.formula ?? null);
+      const sameValue =
+        cell.value === target.value ||
+        (cell.value !== null && target.value !== null && Math.abs(cell.value - target.value) < 1e-9);
+      if (!sameFormula || (!cell.formula && !sameValue)) {
+        throw new Error("Esta celda cambió en el Sheet desde que la abriste. Actualiza para ver el valor nuevo.");
+      }
+      return { row, cell, year, month: m + 1 };
+    }
+  }
+  throw new Error("La celda no corresponde a un mes del P&L.");
+}
+
+// ─── Registro de cambios (hoja oculta "Log Portal") ───────────────────────────
+
+export const LOG_SHEET = "Log Portal";
+export const LOG_HEADERS = [
+  "Fecha (hora del usuario)",
+  "Zona horaria",
+  "Usuario",
+  "Celda",
+  "Fila",
+  "Mes",
+  "Valor anterior",
+  "Valor nuevo",
+];
+
+const LOG_MONTHS = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEPT", "OCT", "NOV", "DIC"];
+const DEFAULT_TIME_ZONE = "America/La_Paz";
+
+/** Zona horaria IANA enviada por el navegador ("America/Montevideo"); si no es válida, La Paz. */
+export function safeTimeZone(zone: unknown): string {
+  if (typeof zone !== "string" || zone.length > 64 || !/^[A-Za-z_]+(\/[A-Za-z0-9_+-]+)*$/.test(zone)) {
+    return DEFAULT_TIME_ZONE;
+  }
+  try {
+    new Intl.DateTimeFormat("es", { timeZone: zone });
+    return zone;
+  } catch {
+    return DEFAULT_TIME_ZONE;
+  }
+}
+
+/**
+ * Una fila del registro. El momento lo pone el servidor; la zona horaria del
+ * usuario solo define cómo se muestra. Los valores van como texto: una fórmula
+ * se guarda tal cual, sin calcularse.
+ */
+export function logRow(
+  edit: { email: string; address: string; row: number; year: number; month: number; before: string; after: string },
+  when: Date,
+  timeZone: string = DEFAULT_TIME_ZONE
+): string[] {
+  const zone = safeTimeZone(timeZone);
+  const stamp = when.toLocaleString("es-BO", {
+    timeZone: zone,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  return [
+    stamp,
+    zone,
+    edit.email,
+    edit.address,
+    String(edit.row),
+    `${LOG_MONTHS[edit.month - 1]}-${String(edit.year).slice(-2)}`,
+    edit.before || "(vacío)",
+    edit.after || "(vacío)",
+  ];
+}
