@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, FileSpreadsheet, RefreshCw, Search, X } from "lucide-react";
 import {
   describeFormula,
@@ -121,6 +121,7 @@ export function PLBaseView() {
   const [currency, setCurrency] = useState<Currency>("USD");
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [editError, setEditError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -289,6 +290,7 @@ export function PLBaseView() {
 
   async function save() {
     if (!selected || !selectedCell || saving) return;
+    savingRef.current = true;
     setSaving(true);
     setEditError("");
     try {
@@ -315,6 +317,7 @@ export function PLBaseView() {
     } catch (e) {
       setEditError((e as Error).message);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -351,6 +354,8 @@ export function PLBaseView() {
                 disabled={saving}
                 onChange={(e) => setDraft(e.target.value)}
                 onFocus={(e) => e.currentTarget.select()}
+                // Clic afuera = Esc: cancela sin guardar (salvo mientras guarda).
+                onBlur={() => !savingRef.current && setSelected(null)}
                 aria-label={`Valor o fórmula de ${cell.address}`}
                 placeholder="1234,50 o =Q6+Q7"
                 style={{ width: `max(100%, ${Math.min(Math.max(draft.length, 8), 60) + 2}ch)` }}
