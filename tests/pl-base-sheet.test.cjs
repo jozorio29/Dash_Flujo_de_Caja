@@ -163,3 +163,18 @@ test('fila del registro de cambios (Log Portal)', () => {
   assert.equal(madrid[1], 'Europe/Madrid');
   for (const bad of ['Marte/Olympus', '../../etc', '', 42, null]) assert.equal(P.safeTimeZone(bad), 'America/La_Paz');
 });
+
+test('fórmulas con el nombre del concepto en vez de la celda', () => {
+  const labels = P.buildStatement(grid()).labels;
+  assert.equal(labels[6], 'TIGO Bolivia (e-care)');
+  const col = (c) => ({ Q: 'ENE-26', R: 'FEB-26', AB: 'DIC-26' })[c] ?? null;
+  const d = (f, own = 'Q') => P.describeFormula(f, labels, own, col);
+  assert.equal(d('=Q6+Q7'), '[TIGO Bolivia (e-care)] + [Alquiler de Posiciones de trabajo - Tupperware]');
+  assert.equal(d('=SUM(Q6:Q7)'), 'SUM([TIGO Bolivia (e-care)] … [Alquiler de Posiciones de trabajo - Tupperware])');
+  assert.equal(d('=SUM(Q6:AB6)', 'AC'), 'SUM([TIGO Bolivia (e-care)] (ENE-26 a DIC-26))');
+  assert.equal(d('=R6*$Q$13'), '[TIGO Bolivia (e-care)] (FEB-26) * [Salarios agentes]');
+  assert.equal(d('=30955,62/Q4'), '30955,62 / [TC PARALELO]');
+  assert.equal(d('=Q999'), '[Fila 999]');
+  assert.equal(d("=VLOOKUP(Q$3;'Cotizacion Dolar'!$B:$D;2;FALSE)"), "VLOOKUP([INGRESOS OPERATIVOS]; 'Cotizacion Dolar'!$B:$D; 2; FALSE)");
+  assert.equal(d('=IF(Q6>0;"Q6 ok";LOG10(Q7))'), 'IF([TIGO Bolivia (e-care)]>0; "Q6 ok"; LOG10([Alquiler de Posiciones de trabajo - Tupperware]))');
+});

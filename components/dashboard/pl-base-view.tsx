@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, FileSpreadsheet, RefreshCw, Search, X } from "lucide-react";
 import {
+  describeFormula,
   EDITABLE_KINDS,
   editableText,
   type Statement,
@@ -56,9 +57,14 @@ function ancestorsOf(rows: StatementRow[]): Map<number, number[]> {
     }
     while (stack.length && rows[stack[stack.length - 1]].level >= row.level) stack.pop();
     result.set(i, section >= 0 ? [section, ...stack] : [...stack]);
-    if (row.kind === "group") stack.push(i);
+    if (row.kind === "group" || hasDetails(rows, i)) stack.push(i);
   });
   return result;
+}
+
+/** Cuenta con desglose debajo (ej. "Honorarios - …" con total cobrado y %). */
+function hasDetails(rows: StatementRow[], i: number) {
+  return rows[i].kind === "account" && rows[i + 1]?.kind === "detail";
 }
 
 type Currency = "USD" | "BOB";
@@ -123,7 +129,7 @@ export function PLBaseView() {
   const rows = useMemo(() => data?.rows ?? [], [data]);
   const ancestors = useMemo(() => ancestorsOf(rows), [rows]);
   const collapsibleIndexes = useMemo(
-    () => rows.map((r, i) => (r.kind === "group" || r.kind === "section" ? i : -1)).filter((i) => i >= 0),
+    () => rows.map((r, i) => (r.kind === "group" || r.kind === "section" || hasDetails(rows, i) ? i : -1)).filter((i) => i >= 0),
     [rows]
   );
   const accounts = rows.filter((r) => r.kind === "account").length;
@@ -230,6 +236,24 @@ export function PLBaseView() {
   }
 
   const selectedCell = selected && year ? selected.row.cells[year]?.[selected.month] : undefined;
+
+  // Mes de cada columna del Sheet ("R" → "FEB-26", "AC" → "TOTAL 2026").
+  const columnNames = useMemo(() => {
+    const names = new Map<string, string>();
+    for (const y of data?.years ?? []) {
+      const cells = rows.find((r) => r.cells[y]?.length)?.cells[y] ?? [];
+      cells.forEach((c, m) => {
+        const col = c.address.replace(/\d+$/, "");
+        if (col) names.set(col, m === 12 ? `TOTAL ${y}` : `${MONTHS[m]}-${String(y).slice(-2)}`);
+      });
+    }
+    return names;
+  }, [data, rows]);
+
+  /** Fórmula con los conceptos de la columna B en vez de las celdas. */
+  function readable(formula: string, cell: StatementCell) {
+    return describeFormula(formula, data?.labels ?? {}, cell.address.replace(/\d+$/, ""), (c) => columnNames.get(c) ?? null);
+  }
   const selectedEditable = Boolean(
     data?.canEdit && selected && selectedCell && selected.month < 12 && EDITABLE_KINDS.includes(selected.row.kind)
   );
@@ -280,7 +304,7 @@ export function PLBaseView() {
             isTotal && "border-l border-slate-200 font-semibold",
             isSelected && "outline outline-2 -outline-offset-2 outline-blue-500"
           )}
-          title={cell.formula ? `${cell.address}: ${cell.formula}` : cell.address}
+          title={cell.formula ? `${cell.address}: = ${readable(cell.formula, cell)}\n${cell.formula}` : cell.address}
           onClick={() => select(row, m)}
         >
           {shown.empty ? <span className="text-slate-400">—</span> : shown.text}
@@ -444,11 +468,19 @@ export function PLBaseView() {
                   <button type="button" disabled={saving} className={cn(button, "py-1.5")} onClick={() => setSelected(null)}>
                     Cancelar
                   </button>
+                  {draft.trim().startsWith("=") && (
+                    <span className="w-full text-[12px] text-slate-700">= {readable(draft, selectedCell)}</span>
+                  )}
                 </form>
               ) : (
                 <>
                   {selectedCell.formula && (
-                    <code className="rounded bg-white px-2 py-0.5 font-mono text-[11px] text-slate-700">{selectedCell.formula}</code>
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                      <span className="rounded bg-white px-2 py-0.5 text-[12px] text-slate-800">
+                        = {readable(selectedCell.formula, selectedCell)}
+                      </span>
+                      <code className="font-mono text-[10px] text-slate-500">{selectedCell.formula}</code>
+                    </span>
                   )}
                   {selectedEditable && currency === "BOB" && (
                     <span className="text-blue-700">Para editar cambia la moneda a USD (el Sheet guarda USD).</span>
@@ -525,12 +557,14 @@ export function PLBaseView() {
                     );
                   }
                   const isGroup = row.kind === "group";
+                  const isParent = hasDetails(rows, i);
                   const strong = row.kind === "total" || row.kind === "result";
                   return (
                     <tr
                       key={key}
                       className={cn(
                         strong ? "bg-blue-50 font-semibold text-blue-900" : isGroup ? "bg-slate-50 font-semibold text-slate-800" : "hover:bg-blue-50/40",
+                        isParent && "font-semibold text-slate-800",
                         row.kind === "detail" && "text-slate-500",
                         row.kind === "info" && "italic text-slate-500"
                       )}
@@ -539,7 +573,13 @@ export function PLBaseView() {
                         scope="row"
                         className={cn(
                           firstCell,
-                          strong ? "bg-blue-50" : isGroup ? "bg-slate-50" : "bg-white font-normal text-slate-600",
+                          strong
+                            ? "bg-blue-50"
+                            : isGroup
+                              ? "bg-slate-50"
+                              : isParent
+                                ? "bg-white font-semibold text-slate-800"
+                                : "bg-white font-normal text-slate-600",
                           row.kind === "detail" && "text-[11px]"
                         )}
                         style={{ paddingLeft: 36 + row.level * 16 }}
@@ -548,8 +588,14 @@ export function PLBaseView() {
                         <span className="absolute left-2 top-1/2 w-6 -translate-y-1/2 text-right text-[10px] font-normal not-italic tabular-nums text-slate-400">
                           {row.row}
                         </span>
-                        {isGroup ? (
-                          <button type="button" className="inline-flex items-center gap-1 text-left" onClick={() => toggle(i)} aria-expanded={!collapsed.has(i)}>
+                        {isGroup || isParent ? (
+                          <button
+                            type="button"
+                            className={cn("inline-flex items-center gap-1 text-left", isParent && "-ml-5")}
+                            onClick={() => toggle(i)}
+                            aria-expanded={!collapsed.has(i)}
+                            title={collapsed.has(i) ? "Ver desglose" : "Ocultar desglose"}
+                          >
                             {collapsed.has(i) ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
                             {row.label}
                           </button>

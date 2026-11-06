@@ -232,6 +232,8 @@ export interface StatementRow {
 export interface Statement {
   years: number[];
   rows: StatementRow[];
+  /** Concepto (columna B) de cada fila del Sheet, por número de fila. */
+  labels: Record<number, string>;
 }
 
 const SECTION_TITLES = [
@@ -362,7 +364,58 @@ export function buildStatement(grid: GridCell[][]): Statement {
     push("account", groupLevel + 1);
   }
 
-  return { years: blocks.map((b) => b.year), rows };
+  // Nombre (columna B) de cada fila del Sheet, para leer las fórmulas por concepto.
+  const labels: Record<number, string> = {};
+  grid.forEach((row, r) => {
+    const name = label(row);
+    if (name) labels[r + 1] = name;
+  });
+
+  return { years: blocks.map((b) => b.year), rows, labels };
+}
+
+// ─── Fórmulas legibles ────────────────────────────────────────────────────────
+
+/** Texto entre comillas, referencia a otra hoja, o referencia/rango de esta hoja. */
+const FORMULA_TOKEN =
+  /("[^"]*")|((?:'(?:[^']|'')*'|[A-Za-z_][\w.]*)!\$?[A-Z]{0,3}\$?\d*(?::\$?[A-Z]{0,3}\$?\d*)?)|(?<![\w$.])\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?(?![\w(])/g;
+
+/**
+ * Reemplaza las celdas de una fórmula por el concepto de su fila:
+ * "=Q62+R68" → "[Honorarios - Matias] + [Honorarios - Oscar] (FEB-26)".
+ * Si la celda es de otra columna que la propia, agrega el mes entre paréntesis.
+ * Las referencias a otras hojas y los textos quedan igual.
+ */
+export function describeFormula(
+  formula: string,
+  labels: Record<number, string>,
+  ownColumn: string,
+  columnName: (column: string) => string | null = () => null
+): string {
+  const name = (row: string) => `[${labels[Number(row)] || `Fila ${row}`}]`;
+  const where = (col: string) => (col === ownColumn ? "" : ` (${columnName(col) ?? `col. ${col}`})`);
+  const spaced = (text: string) => text.replace(/\s*([+\-*/;])\s*/g, (_, op) => (op === ";" ? "; " : ` ${op} `));
+
+  const body = formula.trim().replace(/^=/, "");
+  let out = "";
+  let last = 0;
+  for (const m of Array.from(body.matchAll(FORMULA_TOKEN))) {
+    out += spaced(body.slice(last, m.index));
+    last = (m.index ?? 0) + m[0].length;
+    const [, text, external, c1, r1, c2, r2] = m;
+    if (text || external) {
+      out += m[0];
+    } else if (!c2) {
+      out += name(r1) + where(c1);
+    } else if (r1 === r2) {
+      // Misma fila, varios meses: "SUM(Q6:AB6)".
+      out += `${name(r1)} (${columnName(c1) ?? c1} a ${columnName(c2) ?? c2})`;
+    } else {
+      out += `${name(r1)}${c1 !== c2 ? where(c1) : ""} … ${name(r2)}${where(c2)}`;
+    }
+  }
+  out += spaced(body.slice(last));
+  return out.replace(/\s{2,}/g, " ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")").trim();
 }
 
 // ─── Edición ──────────────────────────────────────────────────────────────────
