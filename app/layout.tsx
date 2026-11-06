@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Flujo de Caja | Xtendo",
+  title: "Dash Financiero | Xtendo Bolivia",
   description:
     "Dashboard de análisis financiero - Ingresos, egresos y flujo de caja",
   icons: {
