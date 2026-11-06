@@ -331,7 +331,7 @@ export function PLBaseView() {
             isTotal && "border-l border-slate-200 font-semibold",
             isSelected && "outline outline-2 -outline-offset-2 outline-blue-500"
           )}
-          title={cell.formula ? `${cell.address}: = ${readable(cell.formula, cell)}\n${cell.formula}` : cell.address}
+          title={cell.formula ? `${cell.address} · clic para ver la fórmula` : cell.address}
           onClick={() => select(row, m)}
         >
           {shown.empty ? <span className="text-slate-400">—</span> : shown.text}
