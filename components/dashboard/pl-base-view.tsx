@@ -80,6 +80,33 @@ const RATIO_FORMULA = /^=\$?([A-Z]{1,3})\$?(\d+)\/\$?([A-Z]{1,3})\$?(\d+)$/;
 const bobFormat = (value: number) =>
   value.toLocaleString("es-BO", { maximumFractionDigits: Math.abs(value) < 100 ? 2 : 0 });
 
+/** "[Concepto] (FEB-26)": nombre de la fila y, opcional, el mes de otra columna. */
+const FORMULA_NAME = /\[([^\]]+)\]((?:\s\((?:[A-Z]+-\d{2}(?: a [A-Z]+-\d{2})?|TOTAL \d{4}|col\. [A-Z]+|[A-Z]+ a [A-Z]+)\))?)/g;
+
+/** Fórmula legible: conceptos destacados, operadores y meses en gris. */
+function FormulaText({ text }: { text: string }) {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  for (const m of Array.from(text.matchAll(FORMULA_NAME))) {
+    const index = m.index ?? 0;
+    if (index > last) parts.push(<span key={`o${index}`} className="px-1 text-slate-400">{text.slice(last, index)}</span>);
+    parts.push(
+      <span key={`n${index}`} className="inline-flex items-baseline gap-1 rounded-md bg-blue-50 px-1.5 py-0.5 font-semibold text-slate-900">
+        {m[1]}
+        {m[2] && <span className="text-[10px] font-normal text-blue-600">{m[2].trim().slice(1, -1)}</span>}
+      </span>
+    );
+    last = index + m[0].length;
+  }
+  if (last < text.length) parts.push(<span key="end" className="px-1 text-slate-400">{text.slice(last)}</span>);
+  return (
+    <p className="flex flex-wrap items-center gap-y-1.5 text-[13px] leading-6">
+      <span className="pr-1 font-semibold text-slate-400">=</span>
+      {parts}
+    </p>
+  );
+}
+
 export function PLBaseView() {
   const [data, setData] = useState<(Statement & { canEdit?: boolean }) | null>(null);
   const [error, setError] = useState("");
@@ -468,20 +495,9 @@ export function PLBaseView() {
                   <button type="button" disabled={saving} className={cn(button, "py-1.5")} onClick={() => setSelected(null)}>
                     Cancelar
                   </button>
-                  {draft.trim().startsWith("=") && (
-                    <span className="w-full text-[12px] text-slate-700">= {readable(draft, selectedCell)}</span>
-                  )}
                 </form>
               ) : (
                 <>
-                  {selectedCell.formula && (
-                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                      <span className="rounded bg-white px-2 py-0.5 text-[12px] text-slate-800">
-                        = {readable(selectedCell.formula, selectedCell)}
-                      </span>
-                      <code className="font-mono text-[10px] text-slate-500">{selectedCell.formula}</code>
-                    </span>
-                  )}
                   {selectedEditable && currency === "BOB" && (
                     <span className="text-blue-700">Para editar cambia la moneda a USD (el Sheet guarda USD).</span>
                   )}
@@ -493,6 +509,19 @@ export function PLBaseView() {
                   </button>
                 </>
               )}
+              {(() => {
+                // Fórmula guardada, o la que se está escribiendo al editar.
+                const shown = selectedEditable && currency === "USD" ? draft.trim() : selectedCell.formula ?? "";
+                if (!shown.startsWith("=")) return null;
+                return (
+                  <div className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-3 py-2">
+                    <FormulaText text={readable(shown, selectedCell)} />
+                    <code className="mt-2 block border-t border-slate-100 pt-1.5 font-mono text-[10px] text-slate-400">
+                      {shown}
+                    </code>
+                  </div>
+                );
+              })()}
               {editError && <span className="w-full text-rose-700">{editError}</span>}
             </div>
           )}
