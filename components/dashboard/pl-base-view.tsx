@@ -89,21 +89,21 @@ function FormulaText({ text }: { text: string }) {
   let last = 0;
   for (const m of Array.from(text.matchAll(FORMULA_NAME))) {
     const index = m.index ?? 0;
-    if (index > last) parts.push(<span key={`o${index}`} className="px-1 text-slate-400">{text.slice(last, index)}</span>);
+    if (index > last) parts.push(<span key={`o${index}`} className="px-0.5 text-slate-400">{text.slice(last, index)}</span>);
     parts.push(
-      <span key={`n${index}`} className="inline-flex items-baseline gap-1 rounded-md bg-blue-50 px-1.5 py-0.5 font-semibold text-slate-900">
+      <span key={`n${index}`} className="inline-flex items-baseline gap-1 rounded bg-white px-1 font-semibold text-slate-900 ring-1 ring-blue-100">
         {m[1]}
-        {m[2] && <span className="text-[10px] font-normal text-blue-600">{m[2].trim().slice(1, -1)}</span>}
+        {m[2] && <span className="text-[9px] font-normal text-blue-600">{m[2].trim().slice(1, -1)}</span>}
       </span>
     );
     last = index + m[0].length;
   }
-  if (last < text.length) parts.push(<span key="end" className="px-1 text-slate-400">{text.slice(last)}</span>);
+  if (last < text.length) parts.push(<span key="end" className="px-0.5 text-slate-400">{text.slice(last)}</span>);
   return (
-    <p className="flex flex-wrap items-center gap-y-1.5 text-[13px] leading-6">
+    <span className="inline-flex flex-wrap items-center gap-y-0.5 text-[11px] leading-5">
       <span className="pr-1 font-semibold text-slate-400">=</span>
       {parts}
-    </p>
+    </span>
   );
 }
 
@@ -285,6 +285,8 @@ export function PLBaseView() {
     data?.canEdit && selected && selectedCell && selected.month < 12 && EDITABLE_KINDS.includes(selected.row.kind)
   );
 
+  const editingInCell = selectedEditable && currency === "USD";
+
   async function save() {
     if (!selected || !selectedCell || saving) return;
     setSaving(true);
@@ -332,9 +334,34 @@ export function PLBaseView() {
             isSelected && "outline outline-2 -outline-offset-2 outline-blue-500"
           )}
           title={cell.formula ? `${cell.address} · clic para ver la fórmula` : cell.address}
-          onClick={() => select(row, m)}
+          onClick={() => !isSelected && select(row, m)}
         >
-          {shown.empty ? <span className="text-slate-400">—</span> : shown.text}
+          {isSelected && editingInCell ? (
+            <form
+              className="relative"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void save();
+              }}
+            >
+              <span className="invisible">{shown.empty ? "—" : shown.text}</span>
+              <input
+                autoFocus
+                value={draft}
+                disabled={saving}
+                onChange={(e) => setDraft(e.target.value)}
+                onFocus={(e) => e.currentTarget.select()}
+                aria-label={`Valor o fórmula de ${cell.address}`}
+                placeholder="1234,50 o =Q6+Q7"
+                style={{ width: `max(100%, ${Math.min(Math.max(draft.length, 8), 60) + 2}ch)` }}
+                className="absolute -left-3 -top-2 z-20 rounded-sm border-2 border-blue-500 bg-white px-2 py-[7px] text-left font-mono text-[12px] text-slate-900 shadow-lg outline-none"
+              />
+            </form>
+          ) : shown.empty ? (
+            <span className="text-slate-400">—</span>
+          ) : (
+            shown.text
+          )}
         </td>
       );
     });
@@ -460,11 +487,11 @@ export function PLBaseView() {
           </div>
 
           {selected && selectedCell && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b bg-blue-50 px-5 py-2 text-xs text-blue-900">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b bg-blue-50 px-5 py-1.5 text-[11px] text-blue-900">
               <span className="font-semibold">
                 {selected.row.label} · {selected.month === 12 ? `TOTAL ${year}` : `${MONTHS[selected.month]}-${yy}`}
               </span>
-              <span>Celda {selectedCell.address || "—"}</span>
+              <span className="text-blue-700/70">{selectedCell.address || "—"}</span>
               <span>Valor: {selectedCell.text || "vacío"}{currency === "BOB" && !isRatio(selected.row, selectedCell) ? " USD" : ""}</span>
               {currency === "BOB" && !isRatio(selected.row, selectedCell) && (
                 <span>
@@ -472,56 +499,29 @@ export function PLBaseView() {
                   {selected.month < 12 && rates[selected.month] ? ` (TC ${rates[selected.month]!.toLocaleString("es-BO")})` : ""}
                 </span>
               )}
-              {selectedEditable && currency === "USD" ? (
-                <form
-                  className="flex min-w-[280px] flex-1 flex-wrap items-center gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void save();
-                  }}
-                >
-                  <input
-                    autoFocus
-                    value={draft}
-                    disabled={saving}
-                    onChange={(e) => setDraft(e.target.value)}
-                    aria-label={`Valor o fórmula de ${selectedCell.address}`}
-                    placeholder="1234,50 o =30955,62/Q13"
-                    className="min-w-[200px] flex-1 rounded-md border border-blue-200 bg-white px-2 py-1.5 font-mono text-[12px] text-slate-900 outline-none focus:border-blue-500"
-                  />
-                  <button type="submit" disabled={saving} className={cn(button, "py-1.5")}>
-                    {saving ? "Guardando…" : "Guardar"}
-                  </button>
-                  <button type="button" disabled={saving} className={cn(button, "py-1.5")} onClick={() => setSelected(null)}>
-                    Cancelar
-                  </button>
-                </form>
-              ) : (
-                <>
-                  {selectedEditable && currency === "BOB" && (
-                    <span className="text-blue-700">Para editar cambia la moneda a USD (el Sheet guarda USD).</span>
-                  )}
-                  {data?.canEdit && !selectedEditable && (
-                    <span className="text-slate-500">Esta celda la calcula el Sheet.</span>
-                  )}
-                  <button type="button" className="ml-auto" aria-label="Cerrar detalle" onClick={() => setSelected(null)}>
-                    <X className="h-4 w-4" />
-                  </button>
-                </>
-              )}
               {(() => {
-                // Fórmula guardada, o la que se está escribiendo al editar.
-                const shown = selectedEditable && currency === "USD" ? draft.trim() : selectedCell.formula ?? "";
+                // Fórmula guardada, o la que se está escribiendo en la celda.
+                const shown = editingInCell ? draft.trim() : selectedCell.formula ?? "";
                 if (!shown.startsWith("=")) return null;
                 return (
-                  <div className="mt-1 w-full rounded-lg border border-blue-100 bg-white px-3 py-2">
+                  <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
                     <FormulaText text={readable(shown, selectedCell)} />
-                    <code className="mt-2 block border-t border-slate-100 pt-1.5 font-mono text-[10px] text-slate-400">
-                      {shown}
-                    </code>
-                  </div>
+                    <code className="font-mono text-[10px] text-slate-400">{shown}</code>
+                  </span>
                 );
               })()}
+              <span className="ml-auto flex items-center gap-3">
+                {editingInCell && (
+                  <span className="text-slate-500">{saving ? "Guardando…" : "Enter guarda · Esc cancela"}</span>
+                )}
+                {selectedEditable && currency === "BOB" && (
+                  <span className="text-blue-700">Para editar cambia la moneda a USD (el Sheet guarda USD).</span>
+                )}
+                {data?.canEdit && !selectedEditable && <span className="text-slate-500">Esta celda la calcula el Sheet.</span>}
+                <button type="button" aria-label="Cerrar detalle" onClick={() => setSelected(null)}>
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
               {editError && <span className="w-full text-rose-700">{editError}</span>}
             </div>
           )}
